@@ -5,9 +5,8 @@
 VEX Shell use deterministic file context management system, in a nutshell I can 
 describe it as "Mark once, hot-reload forever". How it works ?
 
-VEX cli experiment CLI agentic system focused on **low memory footprint** and **extremely high flexibility**. \
-Current prefered workflow looks follow: user create own CONFIG.yaml and setup necessary tools for hist project, \
-also he provides AGENT.md file with project description and important details (just like usual), and after VEX ready to work.
+When user ask agent for file content, like "What does func test() from ./main.py ?"
+agent request `cat_tool` for this file, `cat_tool` read file, store in file_context and in future before each user request file content will be updates in history if file was changed (It checked by file modification time info provided by OS).
 
 ![alt text](file_ctx_1.png)
 
