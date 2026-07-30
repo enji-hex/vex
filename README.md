@@ -1,5 +1,5 @@
 
-# VEX CLI
+# VEX SHELL
 
 <style>
     a{color:orange}
