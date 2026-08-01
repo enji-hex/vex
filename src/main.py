@@ -25,14 +25,17 @@ from langgraph.prebuilt import ToolNode
 import json, os
 
 from ui.console import start_session
-from utils.tools import tools, tools_by_name
+from tools.tools import tools, tools_by_name
+from tools.tools_mcp import load_mcp_tools
 from utils import config
 from utils.fs import FileData, sync_loaded_files
 
+
+
 SYSTEM_PROMPT = ""
 MAX_LLM_CALLS = 15
-# MODEL = "inclusionai/ling-3.0-flash:free"
-MODEL = "openai/gpt-oss-120b"
+MODEL = "inclusionai/ling-3.0-flash:free"
+# MODEL = "openai/gpt-oss-120b"
 load_dotenv(".env")
 llm = ChatOpenAI(
     model=MODEL,
@@ -68,6 +71,10 @@ llm = ChatOpenAI(
 #         "options":{"num_ctx":8192}
 #     }
 # )
+
+mcp_tools = load_mcp_tools('http://127.0.0.1:8000/mcp/')
+# append MCP tools
+tools += mcp_tools
 llm_with_tools = llm.bind_tools(tools)
 
 
@@ -80,6 +87,8 @@ class State(TypedDict):
 
 
 # NODES
+
+# REMOVE IT
 def tool_node(state: State):
     result = []
     for tool_call in state["messages"][-1].tool_calls:
@@ -168,6 +177,11 @@ def llm_call_node(state: State):
 DB_DIR = Path.cwd() / ".vex"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "session.db"
+
+import asyncio
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
 
 
 def main():

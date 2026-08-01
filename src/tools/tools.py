@@ -145,3 +145,4 @@ tools = [
 ]
 print(f"Loaded {len(tools)} tools:", [t.name for t in tools])
 tools_by_name = {tool.name: tool for tool in tools}
+

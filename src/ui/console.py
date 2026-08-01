@@ -31,7 +31,7 @@ from pathlib import Path
 from langgraph.checkpoint.sqlite import SqliteSaver
 import ui.colors as colors
 
-from utils.tools import tools, tools_by_name
+from tools.tools import tools, tools_by_name
 from ui.commands import cli_command, CliOutput
 from utils import config
 
