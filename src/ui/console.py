@@ -209,7 +209,8 @@ def restore_token_usage(current_state) -> TokenUsage:
 
 def restore_history(state, console: Console):
     messages: Optional[List[AnyMessage]] = state.values.get("messages")
-    load_last_n = config.CONFIG["chat"]["load_last_n"]
+    llm_config = config.get_config()
+    load_last_n = llm_config["chat"]["load_last_n"]
     if not messages:
         return
 

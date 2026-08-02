@@ -226,7 +226,7 @@ def main():
     checkpointer.setup()
     agent: CompiledStateGraph = graph_builder.compile(checkpointer=checkpointer)
 
-    with open("AGENT.md", encoding="utf-8") as f:
+    with open("AGENTS.md", encoding="utf-8") as f:
         SYSTEM_PROMPT = f.read()
     config.LOGGER.info(f"system prompt len {len(SYSTEM_PROMPT)} chars")
 
