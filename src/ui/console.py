@@ -16,7 +16,7 @@ import sys
 import warnings
 
 
-from utils.config import LOGGER
+from utils.config import LOGGER,get_config
 from dataclasses import dataclass
 from langchain_core.messages import (
     HumanMessage,
@@ -144,7 +144,8 @@ def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
         to_render.append(Spinner("star", text=spinner_text, style="vex.prompt"))
         return Panel(Group(*to_render), border_style="vex.prompt", box=SQUARE)
 
-    keep_tool_logs: bool = not config.CONFIG["chat"]["keep_tool_logs"]
+    config = get_config()
+    keep_tool_logs: bool = not config["chat"]["keep_tool_logs"]
     with Live(
         generate_temp_ui(),
         console=console,

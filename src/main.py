@@ -13,7 +13,6 @@ from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from langgraph.prebuilt import ToolCallTransformer
 from dotenv import load_dotenv
-import operator
 from langchain.messages import (
     HumanMessage,
     AnyMessage,
@@ -82,7 +81,6 @@ llm = ChatOpenAI(
 # tools += mcp_tools
 
 llm_with_tools = llm.bind_tools(tools)
-
 
 class State(TypedDict):
     """Save history of conversation"""
@@ -204,8 +202,6 @@ def main():
     if args.init:
         init_workspace()
         sys.exit(0)
-
-
 
 
     # type_tool = next(t for t in tools if t.name == "browser_type")
