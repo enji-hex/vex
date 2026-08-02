@@ -34,4 +34,4 @@ py-modules = ["main"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"*" = ["templates/*"]
+"templates" = ["*"]

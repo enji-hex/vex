@@ -105,7 +105,7 @@ def format_file_context(loaded_files: Dict[str, FileData]) -> str:
 
 def llm_call_node(state: State):
     global llm_with_tools
-    
+
     current_calls = state.get("llm_calls", 0) + 1
     old_files_snap = state.get("loaded_files", {})
 
@@ -150,7 +150,7 @@ def init_workspace():
     vex_dir = Path.cwd() / ".vex"
     vex_dir.mkdir(parents=True,exist_ok=True)
 
-    for file in resources.files("src.templates").iterdir():
+    for file in resources.files("templates").iterdir():
         content = file.read_text(encoding='utf-8')
         (vex_dir / file.name ).write_text(content)
     
