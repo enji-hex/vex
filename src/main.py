@@ -26,7 +26,9 @@ import json, os
 
 from ui.console import start_session
 from tools.tools import tools, tools_by_name
-from tools.tools_mcp import load_mcp_tools
+
+from tools import tools_mcp_stdio,tools_mcp_network
+
 from utils import config
 from utils.fs import FileData, sync_loaded_files
 
@@ -34,8 +36,8 @@ from utils.fs import FileData, sync_loaded_files
 
 SYSTEM_PROMPT = ""
 MAX_LLM_CALLS = 15
-MODEL = "inclusionai/ling-3.0-flash:free"
-# MODEL = "openai/gpt-oss-120b"
+# MODEL = "inclusionai/ling-3.0-flash:free"
+MODEL = "openai/gpt-oss-120b"
 load_dotenv(".env")
 llm = ChatOpenAI(
     model=MODEL,
@@ -72,9 +74,11 @@ llm = ChatOpenAI(
 #     }
 # )
 
-mcp_tools = load_mcp_tools('http://127.0.0.1:8000/mcp/')
+# mcp_tools_network = tools_mcp_network.load_mcp_tools('http://127.0.0.1:8000/mcp/')
+# mcp_tools,mcp_manager = tools_mcp_stdio.load_mcp_tools()
 # append MCP tools
-tools += mcp_tools
+# tools += mcp_tools
+
 llm_with_tools = llm.bind_tools(tools)
 
 
@@ -178,14 +182,15 @@ DB_DIR = Path.cwd() / ".vex"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "session.db"
 
-import asyncio
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
-
 
 
 def main():
     global SYSTEM_PROMPT
+
+
+    # type_tool = next(t for t in tools if t.name == "browser_type")
+    # print(json.dumps(type_tool.parameters))
+    # return
 
     graph_builder = StateGraph(State)
     graph_builder.add_node("llm_call", llm_call_node)
