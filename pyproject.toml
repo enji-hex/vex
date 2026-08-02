@@ -31,4 +31,4 @@ vex = "src.main:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-vex = ["templates/*"]
+"*" = ["templates/*"]
