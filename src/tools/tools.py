@@ -144,6 +144,6 @@ tools = [
     for _, obj in inspect.getmembers(sys.modules[__name__])
     if isinstance(obj, BaseTool)
 ]
-LOGGER.info(f"Loaded {len(tools)} tools:", [t.name for t in tools])
+LOGGER.info(f"Loaded {len(tools)} tools: {str([t.name for t in tools])}")
 tools_by_name = {tool.name: tool for tool in tools}
 
