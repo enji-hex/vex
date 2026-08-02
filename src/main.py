@@ -37,50 +37,12 @@ import sys
 
 SYSTEM_PROMPT = ""
 MAX_LLM_CALLS = 15
-# MODEL = "inclusionai/ling-3.0-flash:free"
-MODEL = "openai/gpt-oss-120b"
-load_dotenv(".env")
-llm = ChatOpenAI(
-    model=MODEL,
-    api_key=os.getenv("API_KEY"),
-    base_url="https://openrouter.ai/api/v1",
-    temperature=0,
-    max_completion_tokens=8192,
-    timeout=60.0,
-    max_retries=3,
-    stream_usage=True,
-    extra_body={
-        # "include_reasoning": True,
-        "provider": {
-            "order": ["CoreWeave", "DeepInfra"],
-            "allow_fallbacks": True,
-            "data_collection": "deny",
-        }
-        # "reasoning": {
-        #     "effort": "none",
-        #     # "mandatory": True,
-        #     # "exclude": False
-        #     },
-    },
-)
-
-# llm = ChatOpenAI(
-#     model="qwen2.5-coder:latest",
-#     base_url="http://localhost:11434/v1",
-#     api_key="ollama",
-#     stream_usage=True,
-#     temperature=0,
-#     extra_body={
-#         "options":{"num_ctx":8192}
-#     }
-# )
+llm_with_tools = None
 
 # mcp_tools_network = tools_mcp_network.load_mcp_tools('http://127.0.0.1:8000/mcp/')
 # mcp_tools,mcp_manager = tools_mcp_stdio.load_mcp_tools()
 # append MCP tools
 # tools += mcp_tools
-
-llm_with_tools = llm.bind_tools(tools)
 
 class State(TypedDict):
     """Save history of conversation"""
@@ -142,6 +104,8 @@ def format_file_context(loaded_files: Dict[str, FileData]) -> str:
 
 
 def llm_call_node(state: State):
+    global llm_with_tools
+    
     current_calls = state.get("llm_calls", 0) + 1
     old_files_snap = state.get("loaded_files", {})
 
@@ -194,7 +158,8 @@ def init_workspace():
         f.write("")
 
 def main():
-    global SYSTEM_PROMPT
+    global SYSTEM_PROMPT,llm_with_tools
+
     parser = argparse.ArgumentParser(description="VEX Shell agent")
     parser.add_argument("--init","-i",action="store_true",
                         help="Initialize .vex project")
@@ -203,10 +168,46 @@ def main():
         init_workspace()
         sys.exit(0)
 
+    llm_config = config.get_config()
 
-    # type_tool = next(t for t in tools if t.name == "browser_type")
-    # print(json.dumps(type_tool.parameters))
-    # return
+    # MODEL = "inclusionai/ling-3.0-flash:free"
+    MODEL = "openai/gpt-oss-120b"
+    llm = ChatOpenAI(
+        model=MODEL,
+        api_key=llm_config['chat']['api_key'],
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0,
+        max_completion_tokens=8192,
+        timeout=60.0,
+        max_retries=3,
+        stream_usage=True,
+        extra_body={
+            # "include_reasoning": True,
+            "provider": {
+                "order": ["CoreWeave", "DeepInfra"],
+                "allow_fallbacks": True,
+                "data_collection": "deny",
+            }
+            # "reasoning": {
+            #     "effort": "none",
+            #     # "mandatory": True,
+            #     # "exclude": False
+            #     },
+        },
+    )
+
+    # llm = ChatOpenAI(
+    #     model="qwen2.5-coder:latest",
+    #     base_url="http://localhost:11434/v1",
+    #     api_key="ollama",
+    #     stream_usage=True,
+    #     temperature=0,
+    #     extra_body={
+    #         "options":{"num_ctx":8192}
+    #     }
+    # )
+    
+    llm_with_tools = llm.bind_tools(tools)
 
     graph_builder = StateGraph(State)
     graph_builder.add_node("llm_call", llm_call_node)

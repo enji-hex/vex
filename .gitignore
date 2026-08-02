@@ -11,4 +11,5 @@ wheels/
 .venv
 .playwright_mcp/
 .env
+.vex
 sandbox/
