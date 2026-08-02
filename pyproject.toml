@@ -27,6 +27,9 @@ dependencies = [
 [project.scripts]
 vex = "main:main"
 
+[tool.setuptools]
+py-modules = ["main"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
