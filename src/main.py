@@ -151,6 +151,8 @@ def init_workspace():
     vex_dir.mkdir(parents=True,exist_ok=True)
 
     for file in resources.files("templates").iterdir():
+        if file.is_dir() or file.name == "__init__.py": continue
+
         content = file.read_text(encoding='utf-8')
         (vex_dir / file.name ).write_text(content)
     
