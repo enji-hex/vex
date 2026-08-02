@@ -27,11 +27,13 @@ import json, os
 from ui.console import start_session
 from tools.tools import tools, tools_by_name
 
-from tools import tools_mcp_stdio,tools_mcp_network
+from mcp_tools import tools_mcp_network,tools_mcp_stdio
 
 from utils import config
 from utils.fs import FileData, sync_loaded_files
-
+import argparse
+from importlib import resources
+import sys
 
 
 SYSTEM_PROMPT = ""
@@ -182,10 +184,28 @@ DB_DIR = Path.cwd() / ".vex"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "session.db"
 
+def init_workspace():
+    vex_dir = Path.cwd() / ".vex"
+    vex_dir.mkdir(parents=True,exist_ok=True)
 
+    for file in resources.files("src.templates").iterdir():
+        content = file.read_text(encoding='utf-8')
+        (vex_dir / file.name ).write_text(content)
+    
+    with open("AGENTS.md", 'w',encoding="utf-8") as f:
+        f.write("")
 
 def main():
     global SYSTEM_PROMPT
+    parser = argparse.ArgumentParser(description="VEX Shell agent")
+    parser.add_argument("--init","-i",action="store_true",
+                        help="Initialize .vex project")
+    args = parser.parse_args()
+    if args.init:
+        init_workspace()
+        sys.exit(0)
+
+
 
 
     # type_tool = next(t for t in tools if t.name == "browser_type")
@@ -207,7 +227,7 @@ def main():
     checkpointer.setup()
     agent: CompiledStateGraph = graph_builder.compile(checkpointer=checkpointer)
 
-    with open("AGENT_CASUAL.md", encoding="utf-8") as f:
+    with open("AGENT.md", encoding="utf-8") as f:
         SYSTEM_PROMPT = f.read()
     config.LOGGER.info(f"system prompt len {len(SYSTEM_PROMPT)} chars")
 
