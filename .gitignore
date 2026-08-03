@@ -12,4 +12,5 @@ wheels/
 .playwright_mcp/
 .env
 .vex
+*.db
 sandbox/

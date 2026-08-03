@@ -1,5 +1,15 @@
 import re
-from typing import Any, Callable, Iterator, List, Literal, Optional, Union
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Union,
+    AsyncIterable,
+)
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolCallTransformer
@@ -16,7 +26,7 @@ import sys
 import warnings
 
 
-from utils.config import LOGGER,get_config
+from utils.config import LOGGER, get_config
 from dataclasses import dataclass
 from langchain_core.messages import (
     HumanMessage,
@@ -71,8 +81,8 @@ class TokenUsage:
 AgentEvent = Union[ToolStart, ToolStop, ReasoningDelta, TextDelta, TokenUsage]
 
 
-def agent_stream(stream) -> Iterator[AgentEvent]:
-    for event in stream:
+async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
+    async for event in stream:
         method = event.get("method")
         params = event.get("params", {})
         data = params.get("data", {})
@@ -131,7 +141,7 @@ def agent_stream(stream) -> Iterator[AgentEvent]:
                 )
 
 
-def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
+async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
     content_str = ""
     stream = agent_stream(raw_stream)
     active_tools: dict[str, ToolStart] = {}
@@ -146,13 +156,14 @@ def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
 
     config = get_config()
     keep_tool_logs: bool = not config["chat"]["keep_tool_logs"]
+    
     with Live(
         generate_temp_ui(),
         console=console,
         refresh_per_second=12,
         transient=keep_tool_logs,
     ) as live:
-        for ev in stream:
+        async for ev in stream:
             if isinstance(ev, ToolStart):
                 current_status = (
                     f"[vex.tool]Executing {ev.tool_name}({ev.tool_in})...[/vex.tool]"
@@ -192,7 +203,6 @@ def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
             console.print()
 
     return content_str
-
 
 def restore_token_usage(current_state) -> TokenUsage:
     tu = TokenUsage()
@@ -241,9 +251,9 @@ def restore_history(state, console: Console):
                     console.print()
 
 
-def start_session(agent: CompiledStateGraph, session_id: str = "default"):
+async def start_session(agent: CompiledStateGraph, session_id: str = "default"):
     config: RunnableConfig = {"configurable": {"thread_id": session_id}}
-    current_state = agent.get_state(config)
+    current_state = await agent.aget_state(config)
 
     console = Console(theme=colors.CYBERPUNK.to_rich_theme())
     console.clear()
@@ -254,7 +264,7 @@ def start_session(agent: CompiledStateGraph, session_id: str = "default"):
     prompt_session = prompt.Prompt(console, commands)
 
     while True:
-        user_input = prompt_session.ask("\n[vex.prompt]SHELL > [/vex.prompt]")
+        user_input = await prompt_session.ask("\n[vex.prompt]SHELL > [/vex.prompt]")
         if not user_input:
             continue
 
@@ -270,12 +280,12 @@ def start_session(agent: CompiledStateGraph, session_id: str = "default"):
 
         # clean history
         LOGGER.info(f'user: {user_input.replace("\n"," ")}')
-        stream = agent.stream_events(
+        stream = await agent.astream_events(
             {"messages": [HumanMessage(content=user_input)]},
             config=config,
             version="v3",
             transformers=[ToolCallTransformer],
         )
 
-        resp = execute_agent_step(stream, console, token_usage)
+        resp = await execute_agent_step(stream, console, token_usage)
         LOGGER.info(f'agent: {resp.replace("\n"," ")}')

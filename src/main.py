@@ -1,10 +1,10 @@
 from pathlib import Path
-import sqlite3
-from typing import Annotated, Dict, Literal, TypedDict, List
-import uuid
+import aiosqlite
+
+from typing import Annotated, Dict, TypedDict
 
 from langchain.messages import ToolMessage
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import START, END
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph, StateGraph
@@ -26,27 +26,25 @@ import json, os
 from ui.console import start_session
 from tools.tools import tools, tools_by_name
 
-from mcp_tools import tools_mcp_network,tools_mcp_stdio
+
 
 from utils import config
 from utils.fs import FileData, sync_loaded_files
 import argparse
 from importlib import resources
-import sys
+import sys,time
+import asyncio
 
+start_time = time.perf_counter()
 
 SYSTEM_PROMPT = ""
 MAX_LLM_CALLS = 15
 llm_with_tools = None
+MCP_MANAGER = None
 
-# mcp_tools_network = tools_mcp_network.load_mcp_tools('http://127.0.0.1:8000/mcp/')
-# mcp_tools,mcp_manager = tools_mcp_stdio.load_mcp_tools()
-# append MCP tools
-# tools += mcp_tools
 
 class State(TypedDict):
     """Save history of conversation"""
-
     messages: Annotated[list, add_messages]
     loaded_files: Dict[str, FileData]
     llm_calls: int
@@ -54,35 +52,7 @@ class State(TypedDict):
 
 # NODES
 
-# REMOVE IT
-def tool_node(state: State):
-    result = []
-    for tool_call in state["messages"][-1].tool_calls:
-        tool_name = tool_call["name"]
-        # print('tool call',tool_name)
-        if tool_name not in tools_by_name:
-            result.append(
-                ToolMessage(
-                    content=f"Error: Tool '{tool_name}' not available.",
-                    tool_call_id=tool_call["id"],
-                )
-            )
-            continue
-
-        tool = tools_by_name[tool_call["name"]]
-        config.LOGGER.debug(f'Execute {tool} with ({tool_call["args"]})')
-        try:
-            observation = str(tool.invoke(tool_call["args"]))
-        except Exception as err:
-            observation = f"Error calling {tool_name} {err}"
-
-        result.append(
-            ToolMessage(content=str(observation), tool_call_id=tool_call["id"])
-        )
-
-    return {"messages": result}
-
-
+# conditional edge evaluators should be sync
 def should_continue(state: State):
     # if state.get("llm_calls", 0) >= MAX_LLM_CALLS:
     #     return END
@@ -103,10 +73,14 @@ def format_file_context(loaded_files: Dict[str, FileData]) -> str:
     return "\n".join(blocks)
 
 
-def llm_call_node(state: State):
+async def llm_call_node(state: State):
+    """
+    reservred
+    """
+
     global llm_with_tools
 
-    current_calls = state.get("llm_calls", 0) + 1
+    current_calls  = state.get("llm_calls", 0) + 1
     old_files_snap = state.get("loaded_files", {})
 
     # sync all loaded files
@@ -117,6 +91,7 @@ def llm_call_node(state: State):
     file_context = format_file_context(new_files_snap)
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
 
+    # Handle file_context
     if file_context:
         last_msg = messages[-1]
         updated_content = (
@@ -134,17 +109,12 @@ def llm_call_node(state: State):
             )
 
     config.LOGGER.info(f"messages from llm_call_node {messages}")
-    resp = llm_with_tools.invoke(messages)
+    resp = await llm_with_tools.ainvoke(messages)
     return {
         "messages": [resp],
         "llm_calls": current_calls,
         "loaded_files": new_files_snap,
     }
-
-
-DB_DIR = Path.cwd() / ".vex"
-DB_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DB_DIR / "session.db"
 
 def init_workspace():
     vex_dir = Path.cwd() / ".vex"
@@ -155,12 +125,9 @@ def init_workspace():
 
         content = file.read_text(encoding='utf-8')
         (vex_dir / file.name ).write_text(content)
-    
-    with open("AGENTS.md", 'w',encoding="utf-8") as f:
-        f.write("")
 
-def main():
-    global SYSTEM_PROMPT,llm_with_tools
+async def main():
+    global SYSTEM_PROMPT,llm_with_tools,tools,MCP_MANAGER
 
     parser = argparse.ArgumentParser(description="VEX Shell agent")
     parser.add_argument("--init","-i",action="store_true",
@@ -169,19 +136,18 @@ def main():
     if args.init:
         init_workspace()
         sys.exit(0)
+    
+    
 
     llm_config = config.get_config()
-
-    # MODEL = "inclusionai/ling-3.0-flash:free"
-    MODEL = "openai/gpt-oss-120b"
     llm = ChatOpenAI(
-        model=MODEL,
-        api_key=llm_config['chat']['api_key'],
+        model=llm_config['model']['name'],
+        api_key=llm_config['model']['api_key'],
         base_url="https://openrouter.ai/api/v1",
-        temperature=0,
-        max_completion_tokens=8192,
-        timeout=60.0,
-        max_retries=3,
+        temperature=llm_config['model']['temperature'],
+        max_completion_tokens=llm_config['model']['max_completion_tokens'],
+        timeout=float(llm_config['model']['timeout']),
+        max_retries=int(llm_config['model']['max_retries']),
         stream_usage=True,
         extra_body={
             # "include_reasoning": True,
@@ -197,17 +163,15 @@ def main():
             #     },
         },
     )
+    
+    config.LOGGER.info(f'start time {time.perf_counter() - start_time} secs')
+    # append MCP tools
+    if llm_config['chat']['use_mcp']:
+        from mcp_tools import tools_mcp
+        config.LOGGER.info(f'start time + mcp import {time.perf_counter() - start_time} secs')
 
-    # llm = ChatOpenAI(
-    #     model="qwen2.5-coder:latest",
-    #     base_url="http://localhost:11434/v1",
-    #     api_key="ollama",
-    #     stream_usage=True,
-    #     temperature=0,
-    #     extra_body={
-    #         "options":{"num_ctx":8192}
-    #     }
-    # )
+        mcp_tools,MCP_MANAGER = await tools_mcp.load_mcp_tools()
+        tools += mcp_tools
     
     llm_with_tools = llm.bind_tools(tools)
 
@@ -221,17 +185,26 @@ def main():
     graph_builder.add_conditional_edges("llm_call", should_continue, ["tool_node", END])
     graph_builder.add_edge("tool_node", "llm_call")
 
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-    checkpointer = SqliteSaver(conn)
-    checkpointer.setup()
+    db_path = Path.cwd() / ".vex" / "session.db"
+    conn = await aiosqlite.connect(str(db_path))
+    checkpointer = AsyncSqliteSaver(conn)
+    await checkpointer.setup()
     agent: CompiledStateGraph = graph_builder.compile(checkpointer=checkpointer)
 
-    with open("AGENTS.md", encoding="utf-8") as f:
-        SYSTEM_PROMPT = f.read()
+    if os.path.exists('./AGENTS.md'):
+        with open("AGENTS.md", encoding="utf-8") as f:
+            SYSTEM_PROMPT = f.read()
     config.LOGGER.info(f"system prompt len {len(SYSTEM_PROMPT)} chars")
 
-    start_session(agent)
 
+    end_time = time.perf_counter()
+    config.LOGGER.info(f'start time ready to work {end_time - start_time} secs')
+    try:
+        await start_session(agent)
+    finally:
+        await conn.close()
+        if MCP_MANAGER is not None:
+            await MCP_MANAGER.aclose()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
