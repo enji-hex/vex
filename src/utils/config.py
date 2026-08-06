@@ -1,4 +1,5 @@
 from logging import Logger, FileHandler
+from pathlib import Path
 import yaml
 import logging
 import os
@@ -14,10 +15,14 @@ def get_config():
     global CONFIG
     if CONFIG is not None: return CONFIG
 
-    conf_path = os.path.join(os.getcwd(), ".vex/CONFIG.toml")
-    if not os.path.exists(conf_path):
-        raise Exception("CONFIG not found in .vex folder")
-
-    with open(conf_path,'rb') as f:
-        return tomllib.load(f)
+    candidates = [
+        Path.cwd() / ".vex" / "CONFIG.toml",
+        Path.home() / ".vex" / "CONFIG.toml",
+    ]
+    for p in candidates:
+        if p.is_file():
+            CONFIG =  p.read_text(encoding='utf-8')
+            return CONFIG
+        
+    raise Exception("CONFIG not found in .vex folder")
 
