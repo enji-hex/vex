@@ -125,7 +125,7 @@ async def llm_call_node(state: State):
         "loaded_files": new_files_snap,
     }
 
-def init_workspace(home:bool = False,console:Console):
+def init_workspace(console:Console,home:bool = False):
     vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
     vex_dir.mkdir(parents=True,exist_ok=True)
 
@@ -165,7 +165,7 @@ async def main():
                         help="Initialize .vex project")
     args = parser.parse_args()
 
-    console = Console(theme=colors.CYBERPUNK.to_rich_theme())
+    console = Console(theme=colors.FALLOUT.to_rich_theme())
     if args.init:
         init_workspace(console=console)
         sys.exit(0)
@@ -173,7 +173,7 @@ async def main():
     # no args , init systemwide config
     vex_dir = Path.cwd() / ".vex"
     if not Path.exists(vex_dir):
-        init_workspace(home=True,console=console)
+        init_workspace(console=console,home=True)
 
     SYSTEM_PROMPT = resolve_system_msg()
     
