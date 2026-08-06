@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.scripts]
-vex = "main:main"
+vex = "main:cli"
 
 [tool.setuptools]
 py-modules = ["main"]

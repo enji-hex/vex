@@ -212,8 +212,6 @@ async def main():
     await checkpointer.setup()
     agent: CompiledStateGraph = graph_builder.compile(checkpointer=checkpointer)
 
-    
-
 
     end_time = time.perf_counter()
     config.LOGGER.info(f'start time ready to work {end_time - start_time} secs')
@@ -224,5 +222,9 @@ async def main():
         if MCP_MANAGER is not None:
             await MCP_MANAGER.aclose()
 
-if __name__ == "__main__":
+
+def cli():
     asyncio.run(main())
+
+if __name__ == "__main__":
+    cli()
