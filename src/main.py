@@ -19,7 +19,10 @@ from langchain.messages import (
 )
 from langgraph.prebuilt import ToolNode
 import  os
+
+from rich.console import Console
 from ui.console import start_session
+from ui import colors
 from tools.tools import tools, tools_by_name
 
 from utils import config
@@ -28,6 +31,7 @@ import argparse
 from importlib import resources
 import sys,time
 import asyncio
+from rich import print as rprint
 
 start_time = time.perf_counter()
 
@@ -121,7 +125,7 @@ async def llm_call_node(state: State):
         "loaded_files": new_files_snap,
     }
 
-def init_workspace(home:bool = False):
+def init_workspace(home:bool = False,console:Console):
     vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
     vex_dir.mkdir(parents=True,exist_ok=True)
 
@@ -131,8 +135,14 @@ def init_workspace(home:bool = False):
         content = file.read_text(encoding='utf-8')
         (vex_dir / file.name ).write_text(content)
     
-    print(f'New .vex folder initialized at {vex_dir.absolute()}')
-    print('Iitialization complete Set API keys and adjust settings for your requirements')
+    console.print(
+        f"[vex.success]✓[/vex.success] New .vex folder initialized at "
+        f"[vex.prompt]{vex_dir.absolute()}[/vex.prompt]"
+    )
+    console.print(
+        "[vex.muted]Initialization complete. " \
+        "Set API keys and adjust settings for your requirements.[/vex.muted]"
+    )
 
 
 def resolve_system_msg() -> str:
@@ -154,19 +164,21 @@ async def main():
     parser.add_argument("--init","-i",action="store_true",
                         help="Initialize .vex project")
     args = parser.parse_args()
+
+    console = Console(theme=colors.CYBERPUNK.to_rich_theme())
     if args.init:
-        init_workspace()
+        init_workspace(console=console)
         sys.exit(0)
 
     # no args , init systemwide config
     vex_dir = Path.cwd() / ".vex"
     if not Path.exists(vex_dir):
-        init_workspace(home=True)
+        init_workspace(home=True,console=console)
 
     SYSTEM_PROMPT = resolve_system_msg()
     
     
-    llm_config = config.get_config()
+    llm_config:Dict = config.get_config()
     extra_body=llm_config['model'].get('extra_body')
 
     # reasoning 
@@ -216,7 +228,7 @@ async def main():
     end_time = time.perf_counter()
     config.LOGGER.info(f'start time ready to work {end_time - start_time} secs')
     try:
-        await start_session(agent)
+        await start_session(agent,console=console)
     finally:
         await conn.close()
         if MCP_MANAGER is not None:

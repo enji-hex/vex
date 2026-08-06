@@ -11,7 +11,7 @@ LOGGER.addHandler(FileHandler("vex.log", "w", "utf-8"))
 
 CONFIG = None
 
-def get_config():
+def get_config() -> dict:
     global CONFIG
     if CONFIG is not None: return CONFIG
 
@@ -21,7 +21,7 @@ def get_config():
     ]
     for p in candidates:
         if p.is_file():
-            CONFIG =  p.read_text(encoding='utf-8')
+            CONFIG =  tomllib.loads(p.read_text(encoding='utf-8'))
             return CONFIG
         
     raise Exception("CONFIG not found in .vex folder")

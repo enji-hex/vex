@@ -238,11 +238,10 @@ def restore_history(state, console: Console):
                     console.print()
 
 
-async def start_session(agent: CompiledStateGraph, session_id: str = "default"):
+async def start_session(agent: CompiledStateGraph,console:Console, session_id: str = "default"):
     config: RunnableConfig = {"configurable": {"thread_id": session_id}}
     current_state = await agent.aget_state(config)
 
-    console = Console(theme=colors.CYBERPUNK.to_rich_theme())
     console.clear()
     token_usage: TokenUsage = restore_token_usage(current_state)
     restore_history(current_state, console)
