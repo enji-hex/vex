@@ -9,10 +9,7 @@ from langgraph.graph import START, END
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
-from langchain_openai import ChatOpenAI
-from langchain_ollama import ChatOllama
-from langgraph.prebuilt import ToolCallTransformer
-from dotenv import load_dotenv
+from langchain_openrouter import ChatOpenRouter
 from langchain.messages import (
     HumanMessage,
     AnyMessage,
@@ -21,12 +18,9 @@ from langchain.messages import (
     ToolMessage,
 )
 from langgraph.prebuilt import ToolNode
-import json, os
-
+import  os
 from ui.console import start_session
 from tools.tools import tools, tools_by_name
-
-
 
 from utils import config
 from utils.fs import FileData, sync_loaded_files
@@ -51,7 +45,6 @@ class State(TypedDict):
 
 
 # NODES
-
 # conditional edge evaluators should be sync
 def should_continue(state: State):
     # if state.get("llm_calls", 0) >= MAX_LLM_CALLS:
@@ -79,19 +72,31 @@ async def llm_call_node(state: State):
     """
 
     global llm_with_tools
+    llm_config = config.get_config()
 
     current_calls  = state.get("llm_calls", 0) + 1
     old_files_snap = state.get("loaded_files", {})
 
     # sync all loaded files
     new_files_snap = sync_loaded_files(old_files_snap)
-
     config.LOGGER.info(f"loaded files {str(new_files_snap)}")
 
-    file_context = format_file_context(new_files_snap)
-    messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+
+    # handle sliding window  
+    raw_mesages = state["messages"]
+    window_size = llm_config.get('context_sliding_window')
+    if window_size and  len(raw_mesages) > window_size:
+        recent_messages = list(raw_mesages[-window_size:])
+        while recent_messages and isinstance(recent_messages[0],ToolMessage):
+            window_size+=1
+            recent_messages = list(raw_mesages[-window_size:])
+    else:
+        recent_messages = list(raw_mesages)
+    
+    messages = [SystemMessage(content=SYSTEM_PROMPT)] + recent_messages
 
     # Handle file_context
+    file_context = format_file_context(new_files_snap)
     if file_context:
         last_msg = messages[-1]
         updated_content = (
@@ -116,8 +121,8 @@ async def llm_call_node(state: State):
         "loaded_files": new_files_snap,
     }
 
-def init_workspace():
-    vex_dir = Path.cwd() / ".vex"
+def init_workspace(home:bool = False):
+    vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
     vex_dir.mkdir(parents=True,exist_ok=True)
 
     for file in resources.files("templates").iterdir():
@@ -125,45 +130,61 @@ def init_workspace():
 
         content = file.read_text(encoding='utf-8')
         (vex_dir / file.name ).write_text(content)
+    
+    print(f'New .vex folder initialized at {vex_dir.absolute()}')
+    print('Iitialization complete Set API keys and adjust settings for your requirements')
+
+
+def resolve_system_msg() -> str:
+    candidates = [
+        Path.cwd() / ".vex" / "AGENTS.md",
+        Path.home() / ".vex" / "AGENTS.md"
+    ]
+    for p in candidates:
+        if p.is_file():
+            config.LOGGER.info(f"system prompt len {len(SYSTEM_PROMPT)} chars")
+            return p.read_text(encoding='utf-8')
+
 
 async def main():
     global SYSTEM_PROMPT,llm_with_tools,tools,MCP_MANAGER
 
-    parser = argparse.ArgumentParser(description="VEX Shell agent")
+    parser = argparse.ArgumentParser(description="VEX Shell agent, if u start it from folder where VEX was not initialized " \
+        "by --init flag user .vex folder will be used")
     parser.add_argument("--init","-i",action="store_true",
                         help="Initialize .vex project")
     args = parser.parse_args()
     if args.init:
         init_workspace()
         sys.exit(0)
-    
-    
 
+    # no args , init systemwide config
+    vex_dir = Path.cwd() / ".vex"
+    if not Path.exists(vex_dir):
+        init_workspace(home=True)
+
+    SYSTEM_PROMPT = resolve_system_msg()
+    
+    
     llm_config = config.get_config()
-    llm = ChatOpenAI(
+    extra_body=llm_config['model'].get('extra_body')
+
+    # reasoning 
+    # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+    # timeout trigger error(maybe)
+    llm = ChatOpenRouter(
         model=llm_config['model']['name'],
         api_key=llm_config['model']['api_key'],
         base_url="https://openrouter.ai/api/v1",
         temperature=llm_config['model']['temperature'],
         max_completion_tokens=llm_config['model']['max_completion_tokens'],
-        timeout=float(llm_config['model']['timeout']),
         max_retries=int(llm_config['model']['max_retries']),
         stream_usage=True,
-        extra_body={
-            # "include_reasoning": True,
-            "provider": {
-                "order": ["CoreWeave", "DeepInfra"],
-                "allow_fallbacks": True,
-                "data_collection": "deny",
-            }
-            # "reasoning": {
-            #     "effort": "none",
-            #     # "mandatory": True,
-            #     # "exclude": False
-            #     },
-        },
+        reasoning=llm_config['model']['reasoning']
     )
     
+    config.LOGGER.info(f"extra_body {str(extra_body)}")
+
     config.LOGGER.info(f'start time {time.perf_counter() - start_time} secs')
     # append MCP tools
     if llm_config['chat']['use_mcp']:
@@ -191,10 +212,7 @@ async def main():
     await checkpointer.setup()
     agent: CompiledStateGraph = graph_builder.compile(checkpointer=checkpointer)
 
-    if os.path.exists('./AGENTS.md'):
-        with open("AGENTS.md", encoding="utf-8") as f:
-            SYSTEM_PROMPT = f.read()
-    config.LOGGER.info(f"system prompt len {len(SYSTEM_PROMPT)} chars")
+    
 
 
     end_time = time.perf_counter()

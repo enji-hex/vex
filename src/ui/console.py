@@ -44,42 +44,9 @@ import ui.colors as colors
 from tools.tools import tools, tools_by_name
 from ui.commands import cli_command, CliOutput
 from utils import config
+from ui.events import *
 
 warnings.filterwarnings("ignore", message=".*v3 streaming protocol.*")
-
-
-@dataclass
-class ToolStart:
-    tool_id: str
-    tool_name: str
-    tool_in: str
-
-
-@dataclass
-class ToolStop:
-    tool_id: str
-    tool_out: str
-
-
-@dataclass
-class ReasoningDelta:
-    text: str
-
-
-@dataclass
-class TextDelta:
-    text: str
-
-
-@dataclass
-class TokenUsage:
-    tok_in: int = 0
-    tok_out: int = 0
-    tok_total: int = 0
-
-
-AgentEvent = Union[ToolStart, ToolStop, ReasoningDelta, TextDelta, TokenUsage]
-
 
 async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
     async for event in stream:
@@ -87,7 +54,7 @@ async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
         params = event.get("params", {})
         data = params.get("data", {})
 
-        # LOGGER.info(f"{method} {data}")
+        LOGGER.info(f"{method} {data}")
         if method == "tools":
             event_type = data.get("event")
             if event_type == "tool-started":
@@ -129,6 +96,7 @@ async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
                     or block.get("reasoning_content")
                     or block.get("text", "")
                 )
+                LOGGER.info(f'reasoning {str(reasoning)}')
                 if reasoning:
                     yield ReasoningDelta(reasoning)
 
@@ -143,15 +111,34 @@ async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
 
 async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
     content_str = ""
+    thinking_str = ""
     stream = agent_stream(raw_stream)
     active_tools: dict[str, ToolStart] = {}
     tool_logs: list[str] = []
     current_status = "VEX thinking..."
 
     def generate_temp_ui() -> Panel:
-        to_render = list(tool_logs)
-        spinner_text = Text.from_markup(current_status)
-        to_render.append(Spinner("star", text=spinner_text, style="vex.prompt"))
+        to_render = []
+
+        if tool_logs:
+            to_render.append(Group(*[Text.from_markup(log) for log in tool_logs]))
+        
+        if thinking_str:
+            lines = [l.strip() for l in thinking_str.splitlines() if l.strip()]
+            tail = "\n".join(lines[-4:]) if lines else "..."
+
+            to_render.append(Panel(
+                Text(tail, style="vex.muted"),
+                title="[vex.think]🧠 Thinking[/vex.think]",
+                title_align="left",
+                border_style="vex.think",
+                box=SQUARE,
+            ))
+
+        if current_status:
+            spinner_text = Text.from_markup(current_status)
+            to_render.append(Spinner("star", text=spinner_text, style="vex.prompt"))
+
         return Panel(Group(*to_render), border_style="vex.prompt", box=SQUARE)
 
     config = get_config()
@@ -181,14 +168,14 @@ async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
                 current_status = "VEX is thinking..."
                 live.update(generate_temp_ui())
             elif isinstance(ev, ReasoningDelta):
-                current_status = (
-                    f"[vex.think]🧠 {escape(ev.text.strip())}...[/vex.think]"
-                )
+                thinking_str += ev.text
+                current_status = "[vex.think]Thinking...[/vex.think]"
                 live.update(generate_temp_ui())
             elif isinstance(ev, TextDelta):
                 content_str += ev.text
                 current_status = "[vex.prompt]Generating response...[/vex.prompt]"
                 live.update(generate_temp_ui())
+
             elif isinstance(ev, TokenUsage):
                 token_usage.tok_in += ev.tok_in
                 token_usage.tok_out += ev.tok_out

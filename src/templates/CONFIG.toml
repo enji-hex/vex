@@ -1,0 +1,30 @@
+
+# models
+# 
+
+[chat]
+use_mcp =  true
+# count of messages loaded in console (not sliding window)
+load_last_n =  10
+# keep/hide tool-info boxes
+keep_tool_logs =  false
+context_sliding_window = 10
+
+
+[model]
+name = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+api_key = "user api key"
+temperature = 0
+max_completion_tokens = 4096
+timeout =  60
+max_retries = 3
+
+# https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+[model.reasoning]
+# max_tokens = 2000
+effort = "medium"
+
+[model.extra_body.provider]
+# order = ["CoreWeave", "DeepInfra"]
+allow_fallbacks = true
+# data_collection = "deny"
