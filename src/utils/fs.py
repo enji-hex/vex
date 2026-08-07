@@ -35,4 +35,9 @@ def sync_loaded_files(loaded_files: dict[str, FileData]) -> dict[str, FileData]:
         except Exception as e:
             LOGGER.warning(f"file sync error {e}")
 
+    # delete removed files
+    for p in list(loaded_files):
+        if not os.path.exists(p):
+            del loaded_files[p]
+
     return updated_files if updated_files is not None else loaded_files

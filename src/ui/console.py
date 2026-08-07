@@ -1,14 +1,7 @@
-import re
 from typing import (
-    Any,
     AsyncIterator,
-    Callable,
-    Iterator,
     List,
-    Literal,
     Optional,
-    Union,
-    AsyncIterable,
 )
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
@@ -26,7 +19,7 @@ import sys
 import warnings
 
 
-from utils.config import LOGGER, get_config
+from utils.config import LOGGER
 from dataclasses import dataclass
 from langchain_core.messages import (
     HumanMessage,
@@ -36,26 +29,23 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from ui import prompt
-
-from pathlib import Path
-from langgraph.checkpoint.sqlite import SqliteSaver
-import ui.colors as colors
-
-from tools.tools import tools, tools_by_name
 from ui.commands import cli_command, CliOutput
 from utils import config
 from ui.events import *
 
 warnings.filterwarnings("ignore", message=".*v3 streaming protocol.*")
 
+
 async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
     async for event in stream:
         method = event.get("method")
         params = event.get("params", {})
         data = params.get("data", {})
+        # LOGGER.info(f"messages: {method} {data}")
 
-        LOGGER.info(f"{method} {data}")
         if method == "tools":
+            # LOGGER.debug(f"tools: {method} {data}")
+
             event_type = data.get("event")
             if event_type == "tool-started":
                 raw_args = data.get("input")
@@ -96,7 +86,7 @@ async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
                     or block.get("reasoning_content")
                     or block.get("text", "")
                 )
-                LOGGER.info(f'reasoning {str(reasoning)}')
+                LOGGER.debug(f"reasoning {str(reasoning)}")
                 if reasoning:
                     yield ReasoningDelta(reasoning)
 
@@ -109,7 +99,7 @@ async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
                 )
 
 
-async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
+async def execute_agent_step(raw_stream, settings,console: Console, token_usage) -> str:
     content_str = ""
     thinking_str = ""
     stream = agent_stream(raw_stream)
@@ -122,18 +112,20 @@ async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
 
         if tool_logs:
             to_render.append(Group(*[Text.from_markup(log) for log in tool_logs]))
-        
+
         if thinking_str:
             lines = [l.strip() for l in thinking_str.splitlines() if l.strip()]
             tail = "\n".join(lines[-4:]) if lines else "..."
 
-            to_render.append(Panel(
-                Text(tail, style="vex.muted"),
-                title="[vex.think]🧠 Thinking[/vex.think]",
-                title_align="left",
-                border_style="vex.think",
-                box=SQUARE,
-            ))
+            to_render.append(
+                Panel(
+                    Text(tail, style="vex.muted"),
+                    title="[vex.think]🧠 Thinking[/vex.think]",
+                    title_align="left",
+                    border_style="vex.think",
+                    box=SQUARE,
+                )
+            )
 
         if current_status:
             spinner_text = Text.from_markup(current_status)
@@ -141,9 +133,8 @@ async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
 
         return Panel(Group(*to_render), border_style="vex.prompt", box=SQUARE)
 
-    config = get_config()
-    keep_tool_logs: bool = not config["chat"]["keep_tool_logs"]
-    
+    keep_tool_logs: bool = not settings.chat["keep_tool_logs"]
+
     with Live(
         generate_temp_ui(),
         console=console,
@@ -153,7 +144,7 @@ async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
         async for ev in stream:
             if isinstance(ev, ToolStart):
                 current_status = (
-                    f"[vex.tool]Executing {ev.tool_name}({ev.tool_in})...[/vex.tool]"
+                    f"[vex.tool]Executing {ev.tool_name}({ev.tool_in[:60]})...[/vex.tool]"
                 )
                 active_tools[ev.tool_id] = ev
                 live.update(generate_temp_ui())
@@ -191,6 +182,7 @@ async def execute_agent_step(raw_stream, console: Console, token_usage) -> str:
 
     return content_str
 
+
 def restore_token_usage(current_state) -> TokenUsage:
     tu = TokenUsage()
     if not "messages" in current_state.values:  # early start
@@ -204,10 +196,9 @@ def restore_token_usage(current_state) -> TokenUsage:
     return tu
 
 
-def restore_history(state, console: Console):
+def restore_history(state,settings, console: Console):
     messages: Optional[List[AnyMessage]] = state.values.get("messages")
-    llm_config = config.get_config()
-    load_last_n = llm_config["chat"]["load_last_n"]
+    load_last_n = settings.chat["load_last_n"]
     if not messages:
         return
 
@@ -238,13 +229,15 @@ def restore_history(state, console: Console):
                     console.print()
 
 
-async def start_session(agent: CompiledStateGraph,console:Console, session_id: str = "default"):
+async def start_session(
+    agent: CompiledStateGraph, settings, console: Console, session_id: str = "default"
+):
     config: RunnableConfig = {"configurable": {"thread_id": session_id}}
     current_state = await agent.aget_state(config)
 
     console.clear()
     token_usage: TokenUsage = restore_token_usage(current_state)
-    restore_history(current_state, console)
+    restore_history(current_state,settings, console)
 
     commands = ["/q", "/help", "/stat"]
     prompt_session = prompt.Prompt(console, commands)
@@ -258,7 +251,7 @@ async def start_session(agent: CompiledStateGraph,console:Console, session_id: s
         if user_input.startswith("/"):
             sys.stdout.write("\x1b[1A\x1b[2K")
             sys.stdout.flush()
-            cmd_resp = cli_command(user_input.lower(), console, token_usage)
+            cmd_resp = cli_command(user_input.lower(),settings, console, token_usage)
             if cmd_resp == CliOutput.RES_SKIP:
                 continue
             if cmd_resp == CliOutput.RES_EXIT:
@@ -273,5 +266,5 @@ async def start_session(agent: CompiledStateGraph,console:Console, session_id: s
             transformers=[ToolCallTransformer],
         )
 
-        resp = await execute_agent_step(stream, console, token_usage)
+        resp = await execute_agent_step(stream,settings, console, token_usage)
         LOGGER.info(f'agent: {resp.replace("\n"," ")}')

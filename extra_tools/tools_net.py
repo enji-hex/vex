@@ -4,6 +4,10 @@ import os, sys
 import ast, inspect
 from langchain_core.tools import BaseTool, tool
 
+# 
+# move to MCP
+# 
+
 @tool
 def bandcamp_dl(url: str):
     """

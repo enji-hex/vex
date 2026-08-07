@@ -47,19 +47,17 @@ def show_transient_panel(content: str, title: str, console: Console):
         wait_for_key()
 
 
-def cli_command(cmd, console, token_usage) -> CliOutput:
-    llm_config = config.get_config()
-
+def cli_command(cmd, settings,console, token_usage) -> CliOutput:
     if cmd == "/q":
         return CliOutput.RES_EXIT
     if cmd == "/stat":
-        mcp_state = "enabled" if llm_config['chat']['use_mcp'] == True else "disabled"
+        mcp_state = "enabled" if settings.chat['use_mcp'] == True else "disabled"
         content = (
-            f"\nInput: {token_usage.tok_in:>6} | "
-            f"Output: {token_usage.tok_out:>6} | "
-            f"Total: {token_usage.tok_total:>6}\n"
-            f"Model: {llm_config['model']['name']}\n"
-            f"MCP:   {mcp_state}\n"
+            f"\n{'Input:':<10}{token_usage.tok_in} | "
+            f"Output: {token_usage.tok_out} | "
+            f"Total: {token_usage.tok_total}\n"
+            f"{'Model:':<10}{settings.model['name']}\n"
+            f"{'MCP:':<10}{mcp_state}\n"
         )
         show_transient_panel(content, "Usage Metrics", console)
         return CliOutput.RES_SKIP
