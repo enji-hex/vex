@@ -35,5 +35,5 @@ also he provides AGENTS.md file with project description and important details (
 ## EPs 
 
 1. Separate tools into packets, like `tools_nex`, `tools_c`, `tools_rust` etc. To prevent context overloading with tool specifications
-2. Polish UI
-3. Integrate history *smart* message
+2. create list of sessions
+4. Polish UI

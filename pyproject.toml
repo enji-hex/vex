@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-vex = "src.cli:cli"
+vex = "cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
