@@ -3,16 +3,30 @@
 # 
 
 [chat]
+# control imported MCP tools only, core tools available always
 use_mcp =  true
+
 # count of messages loaded in console (not sliding window)
+# for both load 'load_last_n' and 'context_sliding_window' -1 set infinity length
 load_last_n =  10
-# keep/hide tool-info boxes
-keep_tool_logs =  false
 context_sliding_window = 10
 
+# keep/hide tool-info boxes
+keep_tool_logs =  true
+
+
+[permissions]
+# for both read and write prefixes follow rules applies
+# set prefixes to ['*'] to allow full access 
+# set prefixes to [] to deny access
+# or fill prefixes with list of available targets
+
+read_prefixes = []
+# you can set even not existing directories, agent will create it automatically
+write_prefixes = [ ]
 
 [model]
-name = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+name = "poolside/laguna-s-2.1:free"
 api_key = "user api key"
 temperature = 0
 max_completion_tokens = 4096
@@ -24,7 +38,8 @@ max_retries = 3
 # max_tokens = 2000
 effort = "medium"
 
+# right now doesn't work
 [model.extra_body.provider]
-# order = ["CoreWeave", "DeepInfra"]
-allow_fallbacks = true
-# data_collection = "deny"
+order = ["CoreWeave", "DeepInfra"]
+allow_fallbacks = false
+data_collection = "deny"
