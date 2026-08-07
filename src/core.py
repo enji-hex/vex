@@ -121,8 +121,11 @@ async def llm_call_node(state: State,settings):
         max_completion_tokens=llm_cfg['max_completion_tokens'],
         max_retries=int(llm_cfg['max_retries']),
         stream_usage=True,
-        reasoning=llm_cfg['reasoning']
+        reasoning=llm_cfg['reasoning'],
+        model_kwargs=llm_cfg['extra_body']
+        
     )
+    config.LOGGER.info(f'extra body {llm_cfg['extra_body']}')
     llm_with_tools = llm.bind_tools(tools)
 
     resp = await llm_with_tools.ainvoke(messages)

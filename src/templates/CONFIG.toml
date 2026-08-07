@@ -4,12 +4,11 @@
 
 [chat]
 # control imported MCP tools only, core tools available always
-use_mcp =  true
+use_mcp =  false
 
 # count of messages loaded in console (not sliding window)
-# for both load 'load_last_n' and 'context_sliding_window' -1 set infinity length
-load_last_n =  10
-context_sliding_window = 10
+# for both load 'load_last_n'
+load_last_n =  1
 
 # keep/hide tool-info boxes
 keep_tool_logs =  true
@@ -21,13 +20,24 @@ keep_tool_logs =  true
 # set prefixes to [] to deny access
 # or fill prefixes with list of available targets
 
-read_prefixes = []
+read_prefixes = [
+    "./src/",
+    "./pyproject.toml",
+    "./docs",
+    "./README.md"
+]
 # you can set even not existing directories, agent will create it automatically
-write_prefixes = [ ]
+write_prefixes = [
+    "./docs/reports/"
+]
 
 [model]
+# name = "openai/gpt-oss-120b"
 name = "poolside/laguna-s-2.1:free"
 api_key = "user api key"
+
+# set to -1 set infinity length
+context_sliding_window = 1
 temperature = 0
 max_completion_tokens = 4096
 timeout =  60
@@ -38,8 +48,5 @@ max_retries = 3
 # max_tokens = 2000
 effort = "medium"
 
-# right now doesn't work
-[model.extra_body.provider]
-order = ["CoreWeave", "DeepInfra"]
-allow_fallbacks = false
-data_collection = "deny"
+[model.extra_body]
+repetition_penalty = 2
