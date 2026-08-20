@@ -5,31 +5,41 @@ import yaml
 import logging
 import os
 import tomllib
+import dotenv
 
 LOGGER = Logger("VEX-SHELL")
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(FileHandler("vex.log", "w", "utf-8"))
 
 class Settings:
     def __init__(self) -> None:
         candidates = [
-            Path.cwd() / ".vex" / "CONFIG.toml",
-            Path.home() / ".vex" / "CONFIG.toml",
+            Path.cwd() / ".vex" ,
+            Path.home() / ".vex",
         ]
-        cfg = None
         for p in candidates:
-            if p.is_file():
-                cfg =  tomllib.loads(p.read_text(encoding='utf-8'))
-                break
+            cfg_file =  p / "CONFIG.toml"
+            env_file = p /".env"
+
+            if env_file.is_file():
+                dotenv.load_dotenv(env_file)
+
+            if cfg_file.is_file():
+                cfg =  tomllib.loads(cfg_file.read_text(encoding='utf-8'))
+                provider = cfg.get("model",{}).get("VEX_API_KEY")
+                if os.getenv("VEX_API_KEY") or provider == "ollama":
+                    break
+
         if not cfg:
             raise Exception("CONFIG not found in .vex folder")
         
         self.model: Dict[str, Any] = cfg["model"]
         self.chat: Dict[str, Any] = cfg["chat"]
         self.permissions: Dict[str, List[str]] = cfg["permissions"]
+        self.config_path = p.as_posix()
 
         self.system_prompt = self._get_system_prompt()
-        LOGGER.info(f'system prompt loaded from {p.as_posix()}')
+        LOGGER.info(f'system prompt loaded from {self.config_path}')
 
     def _get_system_prompt(self):
         candidates = [

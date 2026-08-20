@@ -11,7 +11,7 @@ from utils import config
 from utils.file_access import file_access_control
 import core
 
-def init_workspace(console:Console,home:bool = False):
+def init_workspace(console:Console,home:bool = False) -> None:
     vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
     vex_dir.mkdir(parents=True,exist_ok=True)
 
@@ -31,23 +31,29 @@ def init_workspace(console:Console,home:bool = False):
     )
 
 
-def cli():
+def cli() -> None:
     parser = argparse.ArgumentParser(
          description=(
             "VEX Shell – initialise a workspace or start an agent session. "
             "If the current directory has no .vex folder, a user‑wide one is created."
          )
     )
-    parser.add_argument("--init","-i",action="store_true",
-                        help="Initialize .vex project")
-    parser.add_argument("--session","-s",default="default",
-                        help="Initialize .vex project")
+    parser.add_argument("--init","-i",action="store_true",help="Initialize .vex project")
+    parser.add_argument("--session","-s",default="default",help="Initialize .vex project")
+    parser.add_argument("--reset",action="store_true",help="reset sqlite database")
+    parser.add_argument("--reset-global",action="store_true",help="reset global sqlite database (in user home)")
     args = parser.parse_args()
 
     console = Console(theme=colors.FALLOUT.to_rich_theme())
 
     if args.init:
         init_workspace(console=console)
+        sys.exit(0)
+    if args.reset:
+        (Path.cwd() / ".vex" / "session.db").unlink(missing_ok=True)
+        sys.exit(0)
+    if args.reset_global:
+        (Path.home() / ".vex" / "session.db").unlink(missing_ok=True)
         sys.exit(0)
 
     # no args , init systemwide config

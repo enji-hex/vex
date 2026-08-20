@@ -47,7 +47,7 @@ def show_transient_panel(content: str, title: str, console: Console):
         wait_for_key()
 
 
-def cli_command(cmd, settings,console, token_usage) -> CliOutput:
+def cli_command(cmd, settings:config.Settings,console, token_usage) -> CliOutput:
     if cmd == "/q":
         return CliOutput.RES_EXIT
     if cmd == "/stat":
@@ -61,7 +61,11 @@ def cli_command(cmd, settings,console, token_usage) -> CliOutput:
         )
         show_transient_panel(content, "Usage Metrics", console)
         return CliOutput.RES_SKIP
-
+    
+    if cmd == "/env":
+        show_transient_panel(f'Current ENV loaded from: {settings.config_path}',"Env Path",console)
+        return CliOutput.RES_SKIP
+    
     if cmd == "/help":
         content = (
             "██╗   ██╗███████╗██╗  ██╗\n"

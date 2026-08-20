@@ -60,4 +60,4 @@ ENVIRONMENT METADATA:
 
 
 # initialize fa_control
-file_access_control = FileAccessControl(["."],["."])
+file_access_control = FileAccessControl(["."],[])

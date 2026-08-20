@@ -36,9 +36,12 @@ def read_file(
 
     rel_path = target.relative_to(Path.cwd(),walk_up=True).as_posix()
     stat = target.stat()
-    content = target.read_text(encoding='utf-8')
-    line_count = len(content.splitlines())
+    try:
+        content = target.read_text(encoding='utf-8')
+    except Exception as err:
+        return f"read_file: {err}"
     
+    line_count = len(content.splitlines())
     current_files = dict(state.get("loaded_files", {}))
     current_files[rel_path] = FileData(
         content=content, size=stat.st_size, mtime=stat.st_mtime_ns

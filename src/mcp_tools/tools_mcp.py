@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import AsyncExitStack
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 from langchain_core.tools import BaseTool
 from mcp import ClientSession, StdioServerParameters
 
@@ -154,7 +154,7 @@ class MCPManager:
             LOGGER.warning(f"Error during MCP cleanup {e}")
 
 
-async def load_mcp_tools():
+async def load_mcp_tools() -> Tuple[List[BaseTool],MCPManager]:
     mcp_manager = MCPManager()
     conf_path  = os.path.join(os.getcwd(), ".vex/mcp_config.json")
     

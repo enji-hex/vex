@@ -1029,6 +1029,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyexiftool"
+version = "0.5.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/48/406da6691d15abf3c8d399bce8bc588709a5b54e857fd7c22dad2f90c33c/PyExifTool-0.5.6.tar.gz", hash = "sha256:22a972c1c212d1ad5f61916fded5057333dcc48fb8e42eed12d2ff9665b367ae", size = 56365, upload-time = "2023-10-22T23:18:18.819Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fc/b9/175e9a1f8f3f94b22f622f0fcac853ae2c43cb4ac6034f849269c6086dac/PyExifTool-0.5.6-py3-none-any.whl", hash = "sha256:ac7d7836d2bf373f20aa558528f6b2222c4c0d896ed28c951a3ff8e6cec05a87", size = 51243, upload-time = "2023-10-22T23:18:16.614Z" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1675,6 +1684,7 @@ dependencies = [
     { name = "mcp" },
     { name = "prompt-toolkit" },
     { name = "pydantic-settings" },
+    { name = "pyexiftool" },
     { name = "rich" },
     { name = "selectolax" },
 ]
@@ -1693,6 +1703,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.0.0" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
+    { name = "pyexiftool", specifier = ">=0.5.6" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "selectolax", specifier = ">=0.4.11" },
 ]

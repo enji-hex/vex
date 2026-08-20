@@ -41,7 +41,7 @@ async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
         method = event.get("method")
         params = event.get("params", {})
         data = params.get("data", {})
-        # LOGGER.info(f"messages: {method} {data}")
+        # LOGGER.debug(f"messages: {method} {data}")
 
         if method == "tools":
             # LOGGER.debug(f"tools: {method} {data}")
@@ -189,10 +189,13 @@ def restore_token_usage(current_state) -> TokenUsage:
         return tu
     for m in current_state.values["messages"]:
         if hasattr(m, "usage_metadata"):
-            u = m.usage_metadata
-            tu.tok_in += u.get("input_tokens", 0)
-            tu.tok_out += u.get("output_tokens", 0)
-            tu.tok_total += u.get("total_tokens", 0)
+            try:
+                u = m.usage_metadata
+                tu.tok_in += u.get("input_tokens", 0)
+                tu.tok_out += u.get("output_tokens", 0)
+                tu.tok_total += u.get("total_tokens", 0)
+            except Exception as err:
+                LOGGER.error(f'Error get token usage metrics, {err}')
     return tu
 
 
@@ -239,7 +242,7 @@ async def start_session(
     token_usage: TokenUsage = restore_token_usage(current_state)
     restore_history(current_state,settings, console)
 
-    commands = ["/q", "/help", "/stat"]
+    commands = ["/q", "/help", "/stat",'/env']
     prompt_session = prompt.Prompt(console, commands)
 
     while True:
