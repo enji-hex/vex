@@ -1,13 +1,9 @@
-
-# models
-# 
-
 [chat]
 # control imported MCP tools only, core tools available always
 use_mcp =  false
 
 # count of messages loaded in console (not sliding window)
-load_last_n =  1
+load_last_n =  10
 
 # keep/hide tool-info boxes
 keep_tool_logs =  true
@@ -24,12 +20,16 @@ read_prefixes = []
 write_prefixes = []
 
 [model]
-# name = "openai/gpt-oss-120b"
-name = "poolside/laguna-s-2.1:free"
-api_key = "user api key"
+# ollama / openrouter
+provider = "openrouter"
+# optional 
+# llm_url = "http://localhost:11434/v1" 
+
+# name = "qwen2.5-coder:latest"
+name = "openai/gpt-oss-120b"
 
 # set to -1 set infinity length
-context_sliding_window = 1
+context_sliding_window = 10
 temperature = 0
 max_completion_tokens = 4096
 timeout =  60
@@ -40,5 +40,11 @@ max_retries = 3
 # max_tokens = 2000
 effort = "medium"
 
-[model.extra_body]
-repetition_penalty = 1.3
+
+# openrouter 
+# ----------------------
+# [model.extra_body]
+# repetition_penalty = 2
+
+# [model.extra_body.provider]
+# data_collection = "deny"
