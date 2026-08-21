@@ -24,7 +24,7 @@ class Settings:
             env_file = p /".env"
             if env_file.is_file():
                 dotenv.load_dotenv(env_file)
-                break
+                if os.getenv("VEX_API_KEY"):break
 
         for p in candidates:
             cfg_file =  p / "CONFIG.toml"
