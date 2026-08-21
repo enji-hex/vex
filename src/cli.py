@@ -21,6 +21,9 @@ def init_workspace(console:Console,home:bool = False) -> None:
         content = file.read_text(encoding='utf-8')
         (vex_dir / file.name ).write_text(content)
     
+    # write dummy .env
+    (vex_dir / ".env").write_text("VEX_API_KEY=""")
+
     console.print(
         f"[vex.success]✓[/vex.success] New .vex folder initialized at "
         f"[vex.prompt]{vex_dir.absolute()}[/vex.prompt]"

@@ -17,13 +17,17 @@ class Settings:
             Path.cwd() / ".vex" ,
             Path.home() / ".vex",
         ]
-        for p in candidates:
-            cfg_file =  p / "CONFIG.toml"
-            env_file = p /".env"
+        cfg = None
 
+        # separate loading env
+        for p in candidates:
+            env_file = p /".env"
             if env_file.is_file():
                 dotenv.load_dotenv(env_file)
+                break
 
+        for p in candidates:
+            cfg_file =  p / "CONFIG.toml"
             if cfg_file.is_file():
                 cfg =  tomllib.loads(cfg_file.read_text(encoding='utf-8'))
                 provider = cfg.get("model",{}).get("VEX_API_KEY")
@@ -32,6 +36,8 @@ class Settings:
 
         if not cfg:
             raise Exception("CONFIG not found in .vex folder")
+        if not os.getenv("VEX_API_KEY"):
+            raise Exception("VEX_API_KEY not found in env")
         
         self.model: Dict[str, Any] = cfg["model"]
         self.chat: Dict[str, Any] = cfg["chat"]
