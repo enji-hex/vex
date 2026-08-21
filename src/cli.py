@@ -9,6 +9,7 @@ from rich.console import Console
 from ui import colors
 from utils import config
 from utils.file_access import file_access_control
+import sqlite3
 import core
 
 def init_workspace(console:Console,home:bool = False) -> None:
@@ -32,6 +33,16 @@ def init_workspace(console:Console,home:bool = False) -> None:
         "Set API keys and adjust settings for your requirements.[/vex.muted]"
     )
 
+def list_sessions(db_path:str,console:Console) -> None:
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute("SELECT DISTINCT thread_id FROM checkpoints ORDER BY thread_id")
+        rows = cursor.fetchall()
+        ids = [r[0] for r in rows if r[0] is not None]
+        
+        console.print(f"[vex.success][✓] Saved Session[/vex.success] DB_PATH: {db_path}")
+        for id in ids:
+            console.print(f"- {id}")
+
 
 def cli() -> None:
     parser = argparse.ArgumentParser(
@@ -42,6 +53,7 @@ def cli() -> None:
     )
     parser.add_argument("--init","-i",action="store_true",help="Initialize .vex project")
     parser.add_argument("--session","-s",default="default",help="Initialize .vex project")
+    parser.add_argument("--list-sessions","-ls",action='store_true',help="List saved sessions")
     parser.add_argument("--reset",action="store_true",help="reset sqlite database")
     parser.add_argument("--reset-global",action="store_true",help="reset global sqlite database (in user home)")
     args = parser.parse_args()
@@ -72,6 +84,10 @@ def cli() -> None:
          f"Read prefixes: {file_access_control.read_prefixes} | "
          f"Write prefixes: {file_access_control.write_prefixes}"
     )
+
+    if args.list_sessions:
+        list_sessions(settings.db_path,console)
+        sys.exit(0)
 
     asyncio.run(core.run_agent(console,settings,args.session))
 

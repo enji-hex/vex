@@ -1,10 +1,16 @@
+import asyncio
+from collections import defaultdict
 from pathlib import Path
 from typing import List, Literal
 
 class FileAccessControl:
     def __init__(self, read_prefixes: List[str], write_prefixes: List[str]):
         self.reconfigure(read_prefixes,write_prefixes)
+        self.write_locks: defaultdict[Path,asyncio.Lock] = defaultdict(asyncio.Lock)
 
+    def get_write_lock(self,path:Path) -> asyncio.Lock:
+        return self.write_locks[path]
+    
     def reconfigure(self, read_prefixes: List[str], write_prefixes: List[str]):
         self.all_read = "*" in read_prefixes
         self.all_write = "*" in write_prefixes

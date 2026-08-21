@@ -1,4 +1,3 @@
-
 # VEX SHELL
 
 <style>
@@ -15,52 +14,71 @@
 
 VEX is a **terminal‑first AI agent** that keeps your workspace in sync while you interact with large language models. It combines LangChain, LangGraph, and OpenRouter to give you a fast, secure, and extensible development assistant.
 
-
 ## Core Highlights
 - **State‑graph agent** with async SQLite checkpointing – sessions survive crashes and can be resumed.
-- **Active Working Context** – the latest versions of all files you read are injected into the LLM prompt,
-  dramatically cutting token usage.
+- **Active Working Context** – the latest versions of all files you read are injected into the LLM prompt, dramatically cutting token usage.
+- **Automatic cache purge** – on every LLM turn the system syncs loaded files and removes entries for files that no longer exist on disk.
+- **Token usage tracking** – `/stat` shows input, output, and total token counts for the current session.
 - **Sandboxed file access** – strict read/write prefix validation prevents path‑traversal attacks.
-- **Sliding‑window context manager** (≤ 4 k tokens) keeps prompts within model limits.
-- **Dynamic MCP tool loading** – plug‑in external tools at runtime via MCP.
+- **Sliding‑window context manager**  keeps prompts within model limits.
+- **Dynamic MCP tool loading** – plug‑in external tools at runtime via MCP (`.vex/mcp_config.json`).
 - **Rich UI theming** – three ready‑made palettes (Fallout, Cyberpunk, EVA‑03) built on Rich.
 - **Sub‑second local response** – LLM calls return in under a second thanks to token‑budgeted prompts and async I/O.
 
-
-
 ## Quick Start
 ```bash
-# Clone and install
-git clone https://codeberg.org/Enji/vex.git
-cd vex
-pip install -e .
+# Install directly from the repository (no manual clone needed)
+pip install git+https://codeberg.org/Enji/vex.git
 
-# Initialise a workspace
+# Initialise a global configuration (creates ~/.vex if missing)
+# This runs once to set up the global .vex folder
+vex
+
+# Initialise a local workspace in the current directory
 vex --init
 
-# Start an interactive session
+# Set your API key (required for OpenRouter or other providers)
+#   • Global: edit ~/.vex/.env
+#   • Local : edit .vex/.env
+# Example content:
+#   VEX_API_KEY="your‑api‑key‑here"
+
+# Start an interactive session (uses the local .vex if present, otherwise the global one)
 vex
 ```
 
+## Example Workflow
+1. `read_files path/to/module.py` – caches the file in the active context.
+2. Ask the agent: “Refactor `module.py` to use async I/O.”
+3. VEX injects the cached file into the prompt, the LLM returns the refactored code and writes back to  `module.py` with  `write_file` tool. 
 
-Example Workflow
+## Extending VEX
+- Add new LangChain tools in `src/tools/tools.py`.
+- Drop an MCP config in `.vex/mcp_config.json` to load external services.
+- Create a custom Rich palette in `src/ui/colors.py`.
 
-1. read_file path/to/module.py – caches the file in the active context.
-2. Ask the agent: “Refactor module.py to use async I/O.”
-3. VEX injects the cached file into the prompt, the LLM returns the refactored code, and you can write_file the changes
-   back.
+## CLI Flags
 
-Extending VEX
+| Flag | Description |
+|------|-------------|
+| `-i`, `--init` | Initialise a new `.vex` workspace (creates folder and template files). |
+| `-s`, `--session <name>` | Choose a session identifier; defaults to `default`. |
+| `-ls`, `--list-sessions` | List all saved session IDs stored in the SQLite checkpoint database. |
+| `--reset` | Delete the local `.vex/session.db` database, clearing all cached sessions for the current workspace. |
+| `--reset-global` | Delete the global `~/.vex/session.db`, clearing session database at home directory |
 
-- Add new LangChain tools in src/tools/tools.py.
-- Drop an MCP config in .vex/mcp_config.json to load external services.
-- Create a custom Rich palette in src/ui/colors.py.
+## CLI Commands (available during an interactive session)
 
-## In-depth
+| Command | Description |
+|---------|-------------|
+| `/cached` | Show a list of files currently cached in the active working context. |
+| `/stat` | Display token usage statistics (input, output, total) and the model being used. |
+| `/env` | Reveal the path of the loaded environment configuration file (`.env`). |
+| `/help` | Show the help screen with available slash commands. |
+| `/q` | Quit the current VEX session. |
 
+## In‑depth Docs
 - [File Context Management](./docs/file_context_management.md)
 
-
 ## License
-
-GPL-3 – feel free to fork, improve, and share.
+GPL‑3 – feel free to fork, improve, and share.

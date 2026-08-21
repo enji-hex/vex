@@ -21,7 +21,7 @@ class Settings:
 
         # separate loading env
         for p in candidates:
-            env_file = p /".env"
+            env_file = p / ".env"
             if env_file.is_file():
                 dotenv.load_dotenv(env_file)
                 if os.getenv("VEX_API_KEY"):break
@@ -43,6 +43,8 @@ class Settings:
         self.chat: Dict[str, Any] = cfg["chat"]
         self.permissions: Dict[str, List[str]] = cfg["permissions"]
         self.config_path = p.as_posix()
+        self.db_path = (Path(p) / "session.db").as_posix()
+
 
         self.system_prompt = self._get_system_prompt()
         LOGGER.info(f'system prompt loaded from {self.config_path}')

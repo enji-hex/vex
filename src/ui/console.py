@@ -242,7 +242,7 @@ async def start_session(
     token_usage: TokenUsage = restore_token_usage(current_state)
     restore_history(current_state,settings, console)
 
-    commands = ["/q", "/help", "/stat",'/env']
+    commands = ["/q", "/help", "/stat",'/env','/cached']
     prompt_session = prompt.Prompt(console, commands)
 
     while True:
@@ -254,7 +254,8 @@ async def start_session(
         if user_input.startswith("/"):
             sys.stdout.write("\x1b[1A\x1b[2K")
             sys.stdout.flush()
-            cmd_resp = cli_command(user_input.lower(),settings, console, token_usage)
+            cmd_resp = cli_command(user_input.lower(),
+                                   settings, console, token_usage,current_state)
             if cmd_resp == CliOutput.RES_SKIP:
                 continue
             if cmd_resp == CliOutput.RES_EXIT:

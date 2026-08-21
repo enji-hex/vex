@@ -196,7 +196,7 @@ def should_continue(state: State):
         return "tool_node"
     return END
 
-async def run_agent(console,settings,session_id:str):
+async def run_agent(console,settings:config.Settings,session_id:str):
     graph = StateGraph(State)
     
     
@@ -219,8 +219,7 @@ async def run_agent(console,settings,session_id:str):
     )
     graph.add_edge("tool_node", "llm_call")
 
-    db_path = Path.cwd() / ".vex" / "session.db"
-    conn = await aiosqlite.connect(str(db_path))
+    conn = await aiosqlite.connect(settings.db_path)
     checkpointer = AsyncSqliteSaver(conn)
     await checkpointer.setup()
 

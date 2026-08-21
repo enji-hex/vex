@@ -47,7 +47,8 @@ def show_transient_panel(content: str, title: str, console: Console):
         wait_for_key()
 
 
-def cli_command(cmd, settings:config.Settings,console, token_usage) -> CliOutput:
+def cli_command(cmd, settings:config.Settings,console,
+                token_usage,state) -> CliOutput:
     if cmd == "/q":
         return CliOutput.RES_EXIT
     if cmd == "/stat":
@@ -84,6 +85,16 @@ def cli_command(cmd, settings:config.Settings,console, token_usage) -> CliOutput
         show_transient_panel(content, "Help", console)
         return CliOutput.RES_SKIP
 
+    if cmd == "/cached":
+        loaded = state.values.get("loaded_files",{})
+        cached = list(loaded.keys())
+        if not cached:
+            content = "No files are currently cached in the active working context."
+        else:
+            content = "Cached files:\n" + "\n".join(f"- {p}" for p in cached)
+        show_transient_panel(content,"Cached Files",console)
+        return CliOutput.RES_SKIP
+    
     # Feedback for unrecognized slash commands
     if cmd.startswith("/"):
         show_transient_panel(
