@@ -185,7 +185,7 @@ class Agent:
 
 
     async def run_step(self,user_input:str) -> AsyncIterator[AgentEvent]:
-        stream = self.graph.astream_events(
+        stream = await self.graph.astream_events(
             {"messages": [HumanMessage(content=user_input)]},
             config=self.config,
             version="v3",
