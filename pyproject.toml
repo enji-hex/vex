@@ -23,7 +23,6 @@ dependencies = [
     "pillow>=12.3.0",
     "prompt-toolkit>=3.0.52",
     "pydantic-settings>=2.14.2",
-    "pyexiftool>=0.5.6",
     "rich>=15.0.0",
     "selectolax>=0.4.11"
 ]
