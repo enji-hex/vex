@@ -1,7 +1,8 @@
 import os
+from pathlib import Path
 from typing import TypedDict
 from utils.config import LOGGER
-
+from utils.file_access import file_access_control
 
 class FileData(TypedDict):
     content: str
@@ -14,30 +15,35 @@ def sync_loaded_files(loaded_files: dict[str, FileData]) -> dict[str, FileData]:
     if not loaded_files:
         return {}
 
-    updated_files = None
-    for path, cached in loaded_files.items():
+    cwd = Path(file_access_control.cwd)
+    updated_files = dict(loaded_files)
+    modified = False
+
+    for rel_path, cached in loaded_files.items():
+        full_path = cwd / rel_path
+        
+        if not full_path.exists():
+            del updated_files[rel_path]
+            modified = True
+            continue
+
         try:
-            stat = os.stat(path)
+            stat = full_path.stat()
             # nothing changes
             if stat.st_mtime_ns == cached["mtime"] and stat.st_size == cached["size"]:
                 continue
-            with open(path, "r", encoding="utf-8") as f:
-                new_content = f.read()
-            # lazy loading
-            if updated_files is None:
-                updated_files = dict(loaded_files)
 
-            updated_files[path] = FileData(
-                content=new_content, mtime=stat.st_mtime, size=stat.st_size
+            new_content = full_path.read_text(encoding='utf-8')
+            
+            updated_files[rel_path] = FileData(
+                content=new_content, 
+                mtime=stat.st_mtime_ns, 
+                size=stat.st_size
             )
-            LOGGER.info(f"Autosync file:{path}")
+            LOGGER.info(f"Autosync file:{rel_path}")
+            modified = True
 
         except Exception as e:
             LOGGER.warning(f"file sync error {e}")
 
-    # delete removed files
-    for p in list(loaded_files):
-        if not os.path.exists(p):
-            del loaded_files[p]
-
-    return updated_files if updated_files is not None else loaded_files
+    return updated_files if modified else loaded_files

@@ -39,6 +39,9 @@ class Settings:
         if not os.getenv("VEX_API_KEY"):
             raise Exception("VEX_API_KEY not found in env")
         
+        # test
+        self.verification = cfg.get('verification',{})
+        
         self.model: Dict[str, Any] = cfg["model"]
         self.chat: Dict[str, Any] = cfg["chat"]
         self.permissions: Dict[str, List[str]] = cfg["permissions"]

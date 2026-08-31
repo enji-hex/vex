@@ -3,9 +3,6 @@ from typing import (
     List,
     Optional,
 )
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph.state import CompiledStateGraph
-from langgraph.prebuilt import ToolCallTransformer
 from rich.box import SQUARE
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -14,13 +11,9 @@ from rich.markdown import Markdown
 from rich.spinner import Spinner
 from rich.live import Live
 from rich.text import Text
-from rich.markup import escape
 import sys
-import warnings
+from utils.file_access import file_access_control
 
-
-from utils.config import LOGGER
-from dataclasses import dataclass
 from langchain_core.messages import (
     HumanMessage,
     SystemMessage,
@@ -28,81 +21,30 @@ from langchain_core.messages import (
     AIMessage,
     ToolMessage,
 )
+
+from utils.config import LOGGER
 from ui import prompt
 from ui.commands import cli_command, CliOutput
 from utils import config
 from ui.events import *
 
-warnings.filterwarnings("ignore", message=".*v3 streaming protocol.*")
+from engine.stream_processor import Agent
+from engine import stream_processor
 
 
-async def agent_stream(stream) -> AsyncIterator[AgentEvent]:
-    async for event in stream:
-        method = event.get("method")
-        params = event.get("params", {})
-        data = params.get("data", {})
-        # LOGGER.debug(f"messages: {method} {data}")
+def clean_snippet(text:str , limit:int = 60) -> str:
+    cleaned = " ".join(text.splitlines()).strip()
+    return cleaned[:limit] if cleaned else ""
 
-        if method == "tools":
-            # LOGGER.debug(f"tools: {method} {data}")
-
-            event_type = data.get("event")
-            if event_type == "tool-started":
-                raw_args = data.get("input")
-                if isinstance(raw_args, dict):
-                    args_str = ", ".join(f"{k}={v!r}" for k, v in raw_args.items())
-                else:
-                    args_str = str(raw_args or "")
-                yield ToolStart(
-                    data.get("tool_call_id"),
-                    escape(str(data.get("tool_name"))),
-                    args_str,
-                )
-            elif event_type == "tool-finished":
-                yield ToolStop(data.get("tool_call_id"), str(data.get("output")))
-            continue
-
-        if method == "messages":
-            if isinstance(data, (list, tuple)) and len(data) >= 2:
-                msg_data, graph_meta = data[0], data[1]
-            else:
-                continue
-
-            if not isinstance(msg_data, dict) or not isinstance(graph_meta, dict):
-                continue
-            event_type = msg_data.get("event")
-
-            # message
-            block = msg_data.get("fields") or msg_data.get("delta") or {}
-            delta_type = block.get("type")
-
-            if delta_type == "text-delta":
-                text = block.get("text", "")
-                if text:
-                    yield TextDelta(text)
-            elif delta_type in ("reasoning-delta", "reasoningch"):
-                reasoning = (
-                    block.get("reasoning")
-                    or block.get("reasoning_content")
-                    or block.get("text", "")
-                )
-                LOGGER.debug(f"reasoning {str(reasoning)}")
-                if reasoning:
-                    yield ReasoningDelta(reasoning)
-
-            if event_type == "message-finish" and "usage" in msg_data:
-                usage = msg_data["usage"]
-                yield TokenUsage(
-                    tok_in=usage.get("input_tokens", 0),
-                    tok_out=usage.get("output_tokens", 0),
-                    tok_total=usage.get("total_tokens", 0),
-                )
-
-
-async def execute_agent_step(raw_stream, settings,console: Console, token_usage) -> str:
+async def execute_agent_step(stream, 
+                             keep_tool_logs:bool,
+                             console: Console
+                             ) -> str:
+    """
+    Process text only
+    """
     content_str = ""
     thinking_str = ""
-    stream = agent_stream(raw_stream)
     active_tools: dict[str, ToolStart] = {}
     tool_logs: list[str] = []
     current_status = "VEX thinking..."
@@ -111,7 +53,9 @@ async def execute_agent_step(raw_stream, settings,console: Console, token_usage)
         to_render = []
 
         if tool_logs:
-            to_render.append(Group(*[Text.from_markup(log) for log in tool_logs]))
+            max_tool_logs = 5
+            visible_logs = tool_logs[-max_tool_logs:]
+            to_render.append(Group(*[Text.from_markup(log) for log in visible_logs]))
 
         if thinking_str:
             lines = [l.strip() for l in thinking_str.splitlines() if l.strip()]
@@ -133,8 +77,6 @@ async def execute_agent_step(raw_stream, settings,console: Console, token_usage)
 
         return Panel(Group(*to_render), border_style="vex.prompt", box=SQUARE)
 
-    keep_tool_logs: bool = not settings.chat["keep_tool_logs"]
-
     with Live(
         generate_temp_ui(),
         console=console,
@@ -151,9 +93,10 @@ async def execute_agent_step(raw_stream, settings,console: Console, token_usage)
             elif isinstance(ev, ToolStop):
                 tool_start = active_tools.pop(ev.tool_id)
                 if tool_start:
-                    out_snippet = ev.tool_out.replace("\n", "")[:60] or "done"
+                    out_snippet = clean_snippet(ev.tool_out) or "done"
+                    in_snippet  = clean_snippet(tool_start.tool_in)
                     tool_logs.append(
-                        f"[vex.tool]{tool_start.tool_name}[/vex.tool] [vex.muted]({tool_start.tool_in})[/vex.muted]\n"
+                        f"[vex.tool]{tool_start.tool_name}[/vex.tool] [vex.muted]({in_snippet})[/vex.muted]\n"
                         f"  [vex.success]✓[/vex.success] [vex.muted]{out_snippet}[/vex.muted]"
                     )
                 current_status = "VEX is thinking..."
@@ -167,14 +110,6 @@ async def execute_agent_step(raw_stream, settings,console: Console, token_usage)
                 current_status = "[vex.prompt]Generating response...[/vex.prompt]"
                 live.update(generate_temp_ui())
 
-            elif isinstance(ev, TokenUsage):
-                token_usage.tok_in += ev.tok_in
-                token_usage.tok_out += ev.tok_out
-                token_usage.tok_total += ev.tok_total
-                LOGGER.info(
-                    f"token usage for message in:{ev.tok_in} out:{ev.tok_out} total:{ev.tok_total}"
-                )
-
         if content_str:
             console.print("\n[vex.tool]VEX >[/vex.tool]")
             console.print(Markdown(content_str, code_theme="monokai"))
@@ -183,45 +118,18 @@ async def execute_agent_step(raw_stream, settings,console: Console, token_usage)
     return content_str
 
 
-def restore_token_usage(current_state) -> TokenUsage:
-    tu = TokenUsage()
-    if not "messages" in current_state.values:  # early start
-        return tu
-    for m in current_state.values["messages"]:
-        if hasattr(m, "usage_metadata"):
-            try:
-                u = m.usage_metadata
-                tu.tok_in += u.get("input_tokens", 0)
-                tu.tok_out += u.get("output_tokens", 0)
-                tu.tok_total += u.get("total_tokens", 0)
-            except Exception as err:
-                LOGGER.error(f'Error get token usage metrics, {err}')
-    return tu
 
-
-def restore_history(state,settings, console: Console):
-    messages: Optional[List[AnyMessage]] = state.values.get("messages")
-    load_last_n = settings.chat["load_last_n"]
-    if not messages:
-        return
-
-    recent_messages = []
-    for m in messages:
-        if m.type == "human":
-            recent_messages.append(m)
-        if (
-            m.type == "ai"
-            and m.content
-            and any(c.get("type") == "text" for c in m.content)
-        ):
-            recent_messages.append(m)
+# move to Agent
+async def restore_history(agent, console: Console):
+    messages: List[AnyMessage] = await agent.restore_history()
+    load_last_n = agent.settings.chat["load_last_n"]
 
     LOGGER.info(f"found messages {len(messages)}")
     # -1 - load entire history
     if load_last_n != -1:
-        recent_messages = recent_messages[-load_last_n:]
+        messages = messages[-load_last_n:]
 
-    for m in recent_messages:
+    for m in messages:
         if m.type == "human":
             console.print(f"\n[vex.prompt]SHELL > [/vex.prompt] {m.content}")
         if m.type == "ai" and m.content:
@@ -231,18 +139,15 @@ def restore_history(state,settings, console: Console):
                     console.print(Markdown(c["text"], code_theme="monokai"))
                     console.print()
 
-
 async def start_session(
-    agent: CompiledStateGraph, settings, console: Console, session_id: str = "default"
+    agent: Agent, 
+    console: Console, 
 ):
-    config: RunnableConfig = {"configurable": {"thread_id": session_id}}
-    current_state = await agent.aget_state(config)
-
     console.clear()
-    token_usage: TokenUsage = restore_token_usage(current_state)
-    restore_history(current_state,settings, console)
+    keep_tool_logs:bool      = not agent.settings.chat["keep_tool_logs"]
+    await restore_history(agent, console)
 
-    commands = ["/q", "/help", "/stat",'/env','/cached']
+    commands = ["/q", "/help", "/stat",'/env','/cached','/read']
     prompt_session = prompt.Prompt(console, commands)
 
     while True:
@@ -254,8 +159,10 @@ async def start_session(
         if user_input.startswith("/"):
             sys.stdout.write("\x1b[1A\x1b[2K")
             sys.stdout.flush()
-            cmd_resp = cli_command(user_input.lower(),
-                                   settings, console, token_usage,current_state)
+            cmd_resp = await cli_command(user_input.lower(),
+                                   agent,
+                                   console
+                                   )
             if cmd_resp == CliOutput.RES_SKIP:
                 continue
             if cmd_resp == CliOutput.RES_EXIT:
@@ -263,12 +170,7 @@ async def start_session(
 
         # clean history
         LOGGER.info(f'user: {user_input.replace("\n"," ")}')
-        stream = await agent.astream_events(
-            {"messages": [HumanMessage(content=user_input)]},
-            config=config,
-            version="v3",
-            transformers=[ToolCallTransformer],
-        )
-
-        resp = await execute_agent_step(stream,settings, console, token_usage)
+        
+        stream = agent.run_step(user_input)
+        resp = await execute_agent_step(stream,keep_tool_logs, console)
         LOGGER.info(f'agent: {resp.replace("\n"," ")}')
