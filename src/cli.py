@@ -11,7 +11,7 @@ from utils import config
 from utils.file_access import file_access_control
 import sqlite3
 import engine.core as core
-
+import uuid_utils
 
 def init_workspace(console: Console, home: bool = False) -> None:
     vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
