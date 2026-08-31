@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vex_shell"
-version = "0.2.7.1"
+version = "0.2.7.2"
 description = "Lean AI agent that works as u expect"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -25,10 +25,7 @@ dependencies = [
     "pydantic-settings>=2.14.2",
     "pyexiftool>=0.5.6",
     "rich>=15.0.0",
-    "selectolax>=0.4.11",
-    "uuid-utils",
-    "sqlite-vec",
-    "tiktoken"
+    "selectolax>=0.4.11"
 ]
 
 [project.scripts]
@@ -42,8 +39,3 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "templates" = ["*"]
-
-[tool.uv.sources]
-uuid-utils = { path = "stubs/uuid_utils" }
-sqlite-vec = { path = "stubs/sqlite_vec" }
-tiktoken = { path = "stubs/tiktoken" }

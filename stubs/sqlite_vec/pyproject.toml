@@ -1,8 +1,0 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "sqlite-vec"
-version = "0.1.6"
-description = "Dummy stub for Termux / Bionic libc compatibility"
