@@ -50,32 +50,52 @@ async def execute_agent_step(stream,
     current_status = "VEX thinking..."
 
     def generate_temp_ui() -> Panel:
+        safe_width = max(console.width - 2, 20)
+        inner_width = max(safe_width - 4, 16)
+
         to_render = []
 
         if tool_logs:
-            max_tool_logs = 5
+            max_tool_logs = 3
             visible_logs = tool_logs[-max_tool_logs:]
-            to_render.append(Group(*[Text.from_markup(log) for log in visible_logs]))
+
+            formatted_logs = []
+            for log in visible_logs:
+                t = Text.from_markup(log,overflow="ellipsis")
+                t.no_wrap = True
+                formatted_logs.append(t)
+            to_render.append(Group(*formatted_logs))
 
         if thinking_str:
             lines = [l.strip() for l in thinking_str.splitlines() if l.strip()]
-            tail = "\n".join(lines[-4:]) if lines else "..."
+            tail_lines = lines[-2:] if lines else ["..."]
+            tail = "\n".join(tail_lines)
 
             to_render.append(
                 Panel(
-                    Text(tail, style="vex.muted"),
+                    Text(tail, style="vex.muted",overflow='ellipsis'),
                     title="[vex.think]🧠 Thinking[/vex.think]",
                     title_align="left",
                     border_style="vex.think",
+                    width=inner_width,
                     box=SQUARE,
                 )
             )
 
         if current_status:
-            spinner_text = Text.from_markup(current_status)
+            spinner_text = Text.from_markup(
+                current_status,
+                overflow='ellipsis')
+            spinner_text.no_wrap = True
             to_render.append(Spinner("star", text=spinner_text, style="vex.prompt"))
 
-        return Panel(Group(*to_render), border_style="vex.prompt", box=SQUARE)
+        return Panel(
+            Group(*to_render), 
+            border_style="vex.prompt", 
+            box=SQUARE,
+            width=safe_width,
+            expand=False
+            )
 
     with Live(
         generate_temp_ui(),
