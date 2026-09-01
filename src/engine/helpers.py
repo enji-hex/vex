@@ -31,7 +31,7 @@ import re
 import json
 import uuid
 
-from utils.config import Settings
+from utils.config import Settings,LOGGER
 from utils.fs import FileData, sync_loaded_files
 
 from utils.file_access import file_access_control

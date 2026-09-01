@@ -44,6 +44,7 @@ def show_transient_panel(content: str, title: str, console: Console):
             title_align="left",
             box=SQUARE,
             border_style="vex.prompt",
+            expand=False,
             width=max(console.width - 2, 20),
         )
     console.show_cursor(False)
