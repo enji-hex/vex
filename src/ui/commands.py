@@ -49,13 +49,8 @@ def show_transient_panel(content: str, title: str, console: Console):
         )
     console.show_cursor(False)
     try:
-        with Live(
-            panel,
-            console=console,
-            transient=True,
-            auto_refresh=True
-        ) as live:
-            live.refresh()
+        with console.screen():
+            console.print(panel)
             wait_for_key()
     finally:
         console.show_cursor(True)
