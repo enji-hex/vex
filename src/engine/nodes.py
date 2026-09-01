@@ -30,8 +30,8 @@ from utils.config import Settings, LOGGER
 from utils.file_access import file_access_control
 
 from .state import State
+from utils.fs import sync_loaded_files,sync_cwd_tree
 from .helpers import (
-    sync_loaded_files,
     get_safe_window,
     format_file_context,
     normalize_tool_calls,
@@ -54,6 +54,7 @@ async def llm_call_node(
 
     # sync all loaded files
     new_files_snap = sync_loaded_files(state.get("loaded_files", {}))
+    new_cwd_tree  = sync_cwd_tree() if settings.chat.get('autosync_cwd_tree',False) else None
     LOGGER.info(f"cached files {str(', '.join([f for f in new_files_snap.keys()]))}")
 
     # handle sliding window
@@ -67,6 +68,7 @@ async def llm_call_node(
     context_blocks: list = format_file_context(
         env_block,
         new_files_snap,
+        new_cwd_tree,
         config.get("configurable", {}).get("use_vision", False),
     )
 

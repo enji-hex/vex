@@ -173,7 +173,7 @@ async def start_session(
     keep_tool_logs:bool      = not agent.settings.chat["keep_tool_logs"]
     await restore_history(agent, console)
 
-    commands = ["/q", "/help", "/stat",'/env','/cached','/read']
+    commands = ["/q", "/help", "/stat",'/env','/cached','/read','/del']
     prompt_session = prompt.Prompt(console, commands)
 
     while True:

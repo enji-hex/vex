@@ -32,9 +32,7 @@ import json
 import uuid
 
 from utils.config import Settings,LOGGER
-from utils.fs import FileData, sync_loaded_files
-
-from utils.file_access import file_access_control
+from utils.fs import FileData
 
 
 
@@ -66,6 +64,7 @@ def get_safe_window(messages:list, target_window:int) -> list:
 def format_file_context(
         env_block:str,
         loaded_files: Dict[str, FileData],
+        cwd_tree:Optional[str],
         use_vision:bool
     ) -> List[Dict[str,Any]]:
 
@@ -98,6 +97,13 @@ def format_file_context(
                 "text":f"```{path}\n{info['content']}\n```"
             })
     
+    if cwd_tree:
+        content_blocks.append({
+            "type": "text",
+            "text": f"### Active Working Directory Tree\n\n{cwd_tree}\n"
+        })
+    
+    LOGGER.debug(str(content_blocks))
     return content_blocks
 
 

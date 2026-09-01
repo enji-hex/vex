@@ -8,13 +8,11 @@ from langchain_core.tools import BaseTool, tool
 from langchain_core.messages import ToolMessage
 from utils.config import LOGGER
 from typing import Annotated, Dict, List, Tuple
-from utils.fs import FileData
-from collections import defaultdict
-import asyncio
+from engine.state import FileData
 from base64 import b64encode
 from langchain_core.runnables import RunnableConfig
+import time
 
-import mimetypes
 from PIL import Image
 import io
 import pathspec
@@ -61,7 +59,6 @@ def read_image(path:Path,max_dim: int = 1024) -> str:
         b64_data = b64encode(buffer.getvalue()).decode('utf-8')
     
     return f'data:image/jpeg;base64,{b64_data}'
-
 
 def _read_files(
     paths: List[str],
@@ -138,11 +135,16 @@ def read_files(
 async def write_file(
     path: str,
     content:str,
-) -> str:
+    config: RunnableConfig,
+    state: Annotated[dict, InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Command | str:
     """
     Write provided content into the specified file path.
     Create parent folder if it doesn't exist
     """
+    cache_on_write = config.get('configurable',{}).get('cache_on_write',False)
+
     cwd = Path(file_access_control.cwd)
     try:
         target = file_access_control.validate_write(path)
@@ -157,10 +159,28 @@ async def write_file(
         # create directory if not exists
         target.parent.mkdir(exist_ok=True,parents=True)
         target.write_text(data=content,encoding='utf-8')
+        target_stat = target.stat()
     
     rel_path = get_rel_str(target,cwd)
     LOGGER.info(f"write to file {rel_path}")
-    return f"Successfully wrote content to '{rel_path}'"
+    msg_text = f"Successfully wrote content to '{rel_path}'"
+
+    if cache_on_write:
+        new_file_ctx = {rel_path:FileData(
+            content=content,
+            size=target_stat.st_size,
+            mtime=target_stat.st_mtime_ns)}
+        return Command(
+            update={
+                "loaded_files": new_file_ctx,
+                "messages": [
+                    ToolMessage(content=msg_text,tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+    return msg_text
+    
 
 def _glob_tool(glob_patterns: List[str]) -> List[str]:
     matches: list[str] = []
@@ -192,34 +212,12 @@ def glob_tool(glob_patterns: List[str]) -> str:
     """
     Glob tool, accept list of wildcard syntax an return list of related filepath as string, one entry per line
     """
-    matches: list[str] = []
-    LOGGER.debug(f'glob_tool {str(glob_patterns)}')
-    cwd = Path(file_access_control.cwd)
-    spec = get_gitignore_spec(cwd)
-
-    for g in glob_patterns:  # handle multientry glob
-        is_abs = Path(g).is_absolute()
-        
-        for path_str in glob.glob(g, 
-            root_dir=None if is_abs else cwd,
-            recursive=True,
-            include_hidden=False
-            ):
-            full_path = Path(path_str) if is_abs else cwd / path_str
-            try:
-                safe_path = file_access_control.validate_read(full_path.as_posix())
-                rel_path  = get_rel_str(safe_path,cwd)
-                if safe_path.is_file() and not spec.match_file(rel_path):
-                    matches.append(rel_path)
-            except (PermissionError,ValueError):
-                continue
-
+    matches: list[str] = _glob_tool(glob_patterns)
     if not matches:
         return f"No matches found, test other pattern"
     return "\n".join(list(dict.fromkeys(matches)))
         
-@tool
-def tree_tool(root: str = ".") -> str:
+def _tree_tool(root: str = ".") -> str:
     """Return an indented tree view of *root* showing permission-validated files."""
     cwd = Path(file_access_control.cwd)
     base = (
@@ -268,8 +266,13 @@ def tree_tool(root: str = ".") -> str:
                 lines.append(f"{file_indent}{f}")
 
     res = "\n".join(lines)
-    LOGGER.info(f"tree for {root}:\n{res}")
     return res
+
+
+@tool
+def tree_tool(root: str = ".") -> str:
+    """Return an indented tree view of *root* showing permission-validated files."""
+    return _tree_tool(root)
 
     
 tools = [ obj for _, obj in globals().items() if isinstance(obj, BaseTool) ]

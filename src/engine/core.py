@@ -77,6 +77,10 @@ async def run_agent(console,settings:Settings,session_id:str = "default"):
     from ui.console import start_session
     try:
         await start_session(agent,console)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        console.print("\n[yellow]Session interrupted by user. Shutting down...[/yellow]")
+    except Exception as e:
+        console.print(f"\n[red]Unexpected error: {e}[/red]")
     finally:
         await agent.close()
 

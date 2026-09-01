@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import (
     AsyncIterator,
     List,
@@ -11,10 +12,13 @@ from langchain_core.messages import AnyMessage, HumanMessage
 from langgraph.prebuilt import ToolCallTransformer
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import aiosqlite
+from fnmatch import fnmatch
+
 
 from utils.file_access import file_access_control
 
 from mcp_tools.tools_mcp import MCPManager
+
 from utils.config import LOGGER,Settings
 from ui import prompt
 from ui.events import *
@@ -101,6 +105,7 @@ class Agent:
             "configurable": {
                 "thread_id": session_id,
                 "use_vision": settings.model.get("use_vision", False),
+                "cache_on_write":settings.chat.get('cache_on_write',False),
             }
         }
         self.token_usage = TokenUsage()
@@ -124,12 +129,12 @@ class Agent:
     async def get_state(self):
         return await self.graph.aget_state(self.config)
     
-    async def read_files(self,pattern) -> List[str]:
+    async def read_files(self,pattern:str) -> List[str]:
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
 
         files = _glob_tool([pattern])
-        LOGGER.info(f'gloab found {str(files)} files')
+        LOGGER.info(f'glob found {str(files)} files')
         
         loaded,msgs = _read_files(files,self.config,state_values)
         update_payload:dict = {"loaded_files":loaded}
@@ -144,6 +149,42 @@ class Agent:
         LOGGER.info(f'manual caching, cached total {len(loaded)} files')
         return msgs
     
+    async def purge_files(self,pattern:str) -> List[str]:
+        current_state = await self.get_state()
+        state_values = current_state.values if current_state else {}
+        cwd = Path(file_access_control.cwd)
+
+        loaded = state_values.get("loaded_files",{})
+        new_loaded = loaded.copy()
+
+        normalized_patterns = [pattern]
+        for p in _glob_tool([pattern]):
+            try:
+                rel_p = Path(p).relative_to(cwd).as_posix()
+                normalized_patterns.append(rel_p)
+            
+            # if not relative ( like other drive path)
+            except ValueError:
+                normalized_patterns.append(p)
+        
+        msgs = []
+        purge_payloads = {}
+        for key in list(new_loaded.keys()):
+            for p in normalized_patterns:
+                if fnmatch(key,p) or key == p:
+                    purge_payloads[key] = None
+                    msgs.append(f"del from cache {key}")
+                    break
+        
+        if purge_payloads:
+            await self.graph.aupdate_state(
+                self.config,
+                {"loaded_files":purge_payloads},
+                as_node="llm_call")
+        
+        LOGGER.info(f'manual caching, del total {len(loaded)} files')
+        return msgs
+
 
     async def restore_token_usage(self) -> TokenUsage:
         current_state = await self.get_state()

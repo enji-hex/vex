@@ -34,6 +34,8 @@ def wait_for_key():
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
+def _get_state_str(b:bool):
+    return "enabled" if b else "disabled"
 
 def show_transient_panel(content: str, title: str, console: Console):
     """Displays a popup panel that self-destructs after a keypress."""
@@ -67,14 +69,21 @@ async def cli_command(cmd:str,
         use_mcp = agent.settings.chat['use_mcp']
         token_usage = agent.token_usage
         model_name = agent.settings.model['name']
+        # Yes it's crutches
+        autosync_cwd_tree = _get_state_str(agent.settings.chat.get('autosync_cwd_tree',False))
+        cache_on_write    = _get_state_str(agent.settings.chat.get('cache_on_write',False))
 
         mcp_state = "enabled" if use_mcp == True else "disabled"
+        left_padding = 20
         content = (
-            f"\n{'Input:':<10}{token_usage.tok_in} | "
+            f"\n{'Input:':<{left_padding}}{token_usage.tok_in} | "
             f"Output: {token_usage.tok_out} | "
             f"Total: {token_usage.tok_total}\n"
-            f"{'Model:':<10}{model_name}\n"
-            f"{'MCP:':<10}{mcp_state}\n"
+            f"{'Model:':<{left_padding}}{model_name}\n"
+            f"{'MCP:':<{left_padding}}{mcp_state}\n"
+            f"{'CWD auto tree:':<{left_padding}}{autosync_cwd_tree}\n"
+            f"{'Cache on Write:':<{left_padding}}{cache_on_write}\n"
+            
         )
         show_transient_panel(content, "Usage Metrics", console)
         return CliOutput.RES_SKIP
@@ -121,6 +130,13 @@ async def cli_command(cmd:str,
 
         msgs = await agent.read_files(pattern)
         show_transient_panel('\n'.join(msgs),f'Manual Read {pattern}',console)
+        return CliOutput.RES_SKIP
+    
+    if cmd.startswith("/del"):
+        pattern = cmd.split('/del')[-1].strip()
+
+        msgs = await agent.purge_files(pattern)
+        show_transient_panel('\n'.join(msgs),f'Manual Cache Clear {pattern}',console)
         return CliOutput.RES_SKIP
     
     # Feedback for unrecognized slash commands
