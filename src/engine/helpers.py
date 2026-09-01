@@ -31,7 +31,7 @@ import re
 import json
 import uuid
 
-from utils.config import LOGGER,Settings
+from utils.config import Settings
 from utils.fs import FileData, sync_loaded_files
 
 from utils.file_access import file_access_control
@@ -52,7 +52,6 @@ def get_safe_window(messages:list, target_window:int) -> list:
     for msg in sliced:
         if isinstance(msg,ToolMessage):
             tool_name = msg.name
-            LOGGER.info(f'tool name {tool_name}')
             if len(msg.content) > 200 and tool_name != "tree_tool":
                 # truncate long ToolCall messages
                 msg = ToolMessage(

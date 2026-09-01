@@ -19,34 +19,46 @@ class CliOutput(Enum):
 def wait_for_key():
     if os.name == "nt":
         import msvcrt
-
         msvcrt.getch()
+        while msvcrt.kbhit(): msvcrt.getch()
     else:
-        import tty, termios
+        import tty, termios, select
 
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
             sys.stdin.read(1)
+            while select.select([sys.stdin], [], [], 0.001)[0]:
+                sys.stdin.read(1)
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 def show_transient_panel(content: str, title: str, console: Console):
     """Displays a popup panel that self-destructs after a keypress."""
-    with Live(
-        Panel(
+    
+    panel = Panel(
             content,
             title=title,
             title_align="left",
             box=SQUARE,
             border_style="vex.prompt",
-        ),
-        console=console,
-        transient=True,
-    ):
-        wait_for_key()
+            width=max(console.width - 2, 20),
+        )
+    console.show_cursor(False)
+    try:
+        with Live(
+            panel,
+            console=console,
+            transient=True,
+            auto_refresh=True
+        ) as live:
+            live.refresh()
+            wait_for_key()
+    finally:
+        console.show_cursor(True)
+        console.file.flush()
 
 
 async def cli_command(cmd:str, 
@@ -72,7 +84,10 @@ async def cli_command(cmd:str,
         return CliOutput.RES_SKIP
     
     if cmd == "/env":
-        show_transient_panel(f'Current ENV loaded from: {agent.settings.config_path}',"Env Path",console)
+        show_transient_panel((
+            f'{'Current workspace directory: ':<30}{agent.settings.config_path}\n'
+            f'{'Current env path: ':<30}{agent.settings.env_path}'
+            ),"Env Info",console)
         return CliOutput.RES_SKIP
     
     if cmd == "/help":

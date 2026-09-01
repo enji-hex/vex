@@ -7,25 +7,33 @@ import os
 import tomllib
 import dotenv
 
-LOGGER = Logger("VEX-SHELL")
-LOGGER.setLevel(logging.DEBUG)
-LOGGER.addHandler(FileHandler("vex.log", "w", "utf-8"))
+LOGGER = Logger("VEX-SHELL-DEBUG")
+
+
+def reconfigure_logger(path,level):
+    global LOGGER
+    LOGGER.setLevel(level)
+    LOGGER.addHandler(FileHandler(path, "w", "utf-8"))
 
 class Settings:
     def __init__(self) -> None:
         candidates = [
-            Path.cwd() / ".vex" ,
+            Path.cwd()  / ".vex",
             Path.home() / ".vex",
         ]
         cfg = None
 
         # separate loading env
+        # search ENV in CWD/.vex -> HOME/.vex
         for p in candidates:
             env_file = p / ".env"
             if env_file.is_file():
-                dotenv.load_dotenv(env_file)
-                if os.getenv("VEX_API_KEY"):break
+                print(dotenv.load_dotenv(env_file,override=True))
+                if os.getenv("VEX_API_KEY"):
+                    break
 
+        self.env_path = env_file.as_posix()
+        
         for p in candidates:
             cfg_file =  p / "CONFIG.toml"
             if cfg_file.is_file():
@@ -48,6 +56,7 @@ class Settings:
         self.config_path = p.as_posix()
         self.db_path = (Path(p) / "session.db").as_posix()
 
+        reconfigure_logger(f"{self.config_path}/vex.log",logging.DEBUG)
 
         self.system_prompt = self._get_system_prompt()
         LOGGER.info(f'system prompt loaded from {self.config_path}')

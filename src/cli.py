@@ -24,7 +24,8 @@ def init_workspace(console: Console, home: bool = False) -> None:
         content = file.read_text(encoding="utf-8")
         (vex_dir / file.name).write_text(content)
 
-    (vex_dir / ".env").write_text('VEX_API_KEY=""')
+    # set default .env only for home
+    if home: (vex_dir / ".env").write_text('VEX_API_KEY=""')
 
     console.print(
         f"[vex.success]✓[/vex.success] New .vex folder initialized at "
