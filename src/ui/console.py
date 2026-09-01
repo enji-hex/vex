@@ -11,7 +11,7 @@ from rich.markdown import Markdown
 from rich.spinner import Spinner
 from rich.live import Live
 from rich.text import Text
-import sys
+import sys,io
 from utils.file_access import file_access_control
 
 from langchain_core.messages import (
@@ -31,6 +31,12 @@ from ui.events import *
 from engine.stream_processor import Agent
 from engine import stream_processor
 
+if isinstance(sys.stdout, io.TextIOWrapper):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+# Alternative duck-typing check
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 def clean_snippet(text:str , limit:int = 60) -> str:
     cleaned = " ".join(text.splitlines()).strip()
