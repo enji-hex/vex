@@ -130,11 +130,16 @@ class Agent:
 
         files = _glob_tool([pattern])
         LOGGER.info(f'gloab found {str(files)} files')
+        
         loaded,msgs = _read_files(files,self.config,state_values)
+        update_payload:dict = {"loaded_files":loaded}
+
+        if "messages" not in state_values:
+            update_payload["messages"] = []
 
         await self.graph.aupdate_state(
             self.config,
-            {"loaded_files":loaded},
+            update_payload,
             as_node="llm_call")
         LOGGER.info(f'manual caching, cached total {len(loaded)} files')
         return msgs

@@ -178,9 +178,12 @@ async def verification_node(state: State, settings: Settings):
 
     return {}
 
-
 def should_continue(state: State):
-    last = state["messages"][-1]
+    messages = state.get("messages",[])
+    if not messages:
+        return END
+
+    last = messages[-1]
     if isinstance(last, AIMessage) and last.tool_calls:
         return "tool_node"
     return END
