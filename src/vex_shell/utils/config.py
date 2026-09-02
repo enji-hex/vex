@@ -1,12 +1,14 @@
 from logging import Logger, FileHandler
 from pathlib import Path
 from typing import Any, Dict, List
+import yaml
 import logging
 import os
 import tomllib
 import dotenv
 
 LOGGER = Logger("VEX-SHELL-DEBUG")
+
 
 def reconfigure_logger(path,level):
     global LOGGER
@@ -26,6 +28,7 @@ class Settings:
         for p in candidates:
             env_file = p / ".env"
             if env_file.is_file():
+                dotenv.load_dotenv(env_file,override=True)
                 if os.getenv("VEX_API_KEY"):
                     break
 
