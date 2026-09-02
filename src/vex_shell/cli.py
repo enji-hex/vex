@@ -42,7 +42,7 @@ async def list_sessions(agent:Agent, console: Console) -> None:
         console.print(f"- {id}")
 
 async def run_agent(args):
-    console = Console(theme=colors.FALLOUT.to_rich_theme())
+    console = Console(theme=colors.EVA_03.to_rich_theme())
     if args.init:
         init_workspace(console=console)
         return
