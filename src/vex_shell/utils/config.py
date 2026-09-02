@@ -8,7 +8,6 @@ import dotenv
 
 LOGGER = Logger("VEX-SHELL-DEBUG")
 
-
 def reconfigure_logger(path,level):
     global LOGGER
     LOGGER.setLevel(level)
@@ -27,7 +26,6 @@ class Settings:
         for p in candidates:
             env_file = p / ".env"
             if env_file.is_file():
-                print(dotenv.load_dotenv(env_file,override=True))
                 if os.getenv("VEX_API_KEY"):
                     break
 

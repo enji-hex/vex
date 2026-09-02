@@ -4,6 +4,7 @@ from typing import (
     AsyncIterator,
     List,
     Optional,
+    Self,
 )
 import warnings
 from langchain_core.runnables import RunnableConfig
@@ -113,7 +114,7 @@ class Agent:
         session_id:str,
         settings:Settings,
         mcp_manager:Optional[MCPManager] = None
-    ):
+    ) -> Self:
         conn = await aiosqlite.connect(settings.db_path)
         checkpointer = AsyncSqliteSaver(conn)
         await checkpointer.setup()

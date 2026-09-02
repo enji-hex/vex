@@ -12,7 +12,6 @@ class ToolStop:
     tool_id: str
     tool_out: str
 
-
 @dataclass
 class ReasoningDelta:
     text: str
