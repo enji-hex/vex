@@ -15,16 +15,15 @@
 VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*) that keeps your workspace in sync while you interact with large language models. It combines LangChain, LangGraph, and OpenRouter(or ollama) to give you a fast, secure, and extensible development assistant.
 
 ## Core Highlights
-- **State‑graph agent** with async SQLite checkpointing – sessions survive crashes and can be resumed.
-- **Active Working Context** – the latest versions of all files you read and CWD tree are injected into the LLM prompt, dramatically cutting token usage.
-- **Automatic cache purge** – on every LLM turn the system syncs loaded files and removes entries for files that no longer exist on disk.
+- **State‑graph agent** - Powered by async SQLite checkpointing; sessions survive crashes and can be resumed anytime.
+- **Active Working Context** – Automatically injects current file states and directory trees into the prompt, cutting context overhead.
+- **Automatic cache purge** – Syncs loaded files on every LLM turn and purges references to deleted files.
 - **Token usage tracking** – `/stat` shows input, output, and total token counts for the current session.
-- **Sandboxed file access** – strict read/write prefix validation prevents path‑traversal attacks.
-- **Sliding‑window context manager**  keeps prompts within model limits.
-- **Dynamic MCP tool loading** – plug‑in external tools at runtime via MCP (`.vex/mcp_config.json`).
-- **Rich UI theming** – three ready‑made palettes (Fallout, Cyberpunk, EVA‑03) built on Rich.
-- **CWD tree** - optional feature automatically inject tree of curent working directory in LLM prompt (ActiveContext)
-- **Cache on Write** - optional feature, automatically add to FileContext each file written by LLM
+- **Sandboxed file access** – Strict read/write path validation prevents directory traversal attacks.
+- **Dynamic MCP Tool Loading** – Plug external tools into the runtime at launch via `.vex/mcp_config.json`.
+- **CWD Tree Integration** - Optional feature that injects the current working directory hierarchy directly into the active prompt.
+- **Cache-on-Write** - Optional feature that automatically adds files generated or modified by the LLM into the FileContext.
+- **Token Tracking & UI Themes** – Built-in /stat metrics and customizable Rich terminal themes (Fallout, Cyberpunk, EVA-03).
 
 
 ## Quick Start
@@ -50,7 +49,7 @@ vex --init
 vex
 ```
 
-### As Library
+### As Python Library
 
 ```bash
 uv add git+https://codeberg.org/Enji/vex.git
@@ -94,9 +93,8 @@ if __name__ == "__main__":
 ```
 
 Full agent functionality out of the box!!
-All information about available [Events](./src/vex_shell/ui/events.py).
 
-> IMPORTANT **ReasoningDelta** event supported only by openrouter provider
+**Note**: The ReasoningDelta event is currently supported only when using the OpenRouter provider. Refer to [events.py](./src/vex_shell/ui/events.py) for the complete event schema.
 
 
 ## Example Workflow
@@ -105,9 +103,9 @@ All information about available [Events](./src/vex_shell/ui/events.py).
 3. VEX injects the cached file into the prompt, the LLM returns the refactored code and writes back to  `module.py` with  `write_file` tool. 
 
 ## Extending VEX
-- Add new LangChain tools in `src/tools/tools.py`.
-- Drop an MCP config in `.vex/mcp_config.json` to load external services.
-- Create a custom Rich palette in `src/ui/colors.py`.
+- **Custom Tools**: Add standard LangChain tools inside src/vex_shell/engine/tools.py.
+- **MCP Servers**: Configure external Model Context Protocol endpoints inside .vex/mcp_config.json.
+- **UI Themes**: Define custom terminal color schemes inside src/vex_shell/ui/colors.py.
 
 ## CLI Flags
 
@@ -124,14 +122,14 @@ All information about available [Events](./src/vex_shell/ui/events.py).
 | Command | Description |
 |---------|-------------|
 | `/cached` | Show a list of files currently cached in the active working context. |
-| `/read` | Manual add files in FileContext by glob pattern `/read ./src/**` |
-| `/del` | MAnual purge fiels from FileContext by glob pattern `/del ./src/engine/**.py` |
+| `/read <glob>` | Load files into active context matching a glob pattern (e.g., /read ./src/**). |
+| `/del <glob>` | Purge files from active context matching a glob pattern (e.g., /del ./src/engine/**.py). |
 | `/stat` | Display token usage statistics (input, output, total) and the model being used. |
 | `/env` | Reveal the path of the loaded environment configuration file (`.env`). |
 | `/help` | Show the help screen with available slash commands. |
 | `/q` | Quit the current VEX session. |
 
-## In‑depth Docs
+## Additional Documentation
 - [File Context Management](./docs/file_context_management.md)
 
 ## License
