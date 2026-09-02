@@ -32,7 +32,7 @@ VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*)
 ### As Tool
 ```bash
 # Install directly from the repository (no manual clone needed)
-uv tool add git+[https://codeberg.org/Enji/vex.git#egg=vex_shell][cli]
+uv tool install "git+https://codeberg.org/Enji/vex.git#egg=vex_shell[cli]"
 
 # Initialize global config folder ~/.vex
 vex

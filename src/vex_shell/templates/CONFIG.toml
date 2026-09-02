@@ -1,3 +1,5 @@
+# last template
+
 [chat]
 # control imported MCP tools only, core tools available always
 use_mcp =  false
@@ -6,9 +8,12 @@ use_mcp =  false
 load_last_n =  10
 
 # keep/hide tool-info boxes
-keep_tool_logs =  false
+keep_tool_logs =  true
 # optional, ignored if empty
-custom_cwd = "" 
+custom_cwd = ""
+autosync_cwd_tree = true 
+# Auto read each file written by LLM
+cache_on_write    = true
 
 [verification]
 check_command = ""
@@ -30,12 +35,11 @@ provider = "openrouter"
 # optional 
 # llm_url = "http://localhost:11434/v1" 
 
-
 use_vision = false # image read support
 # name = "openai/gpt-oss-120b"
 
-# name = "qwen2.5-coder:latest"
-name = "google/gemma-4-26b-a4b-it"
+name = "dots-studio/dots-3-note-preview:free"
+# name = "google/gemma-4-26b-a4b-it"
 
 # set to -1 set infinity length
 context_sliding_window = 10
