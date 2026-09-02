@@ -2,6 +2,7 @@
 
 # File Context Management 
 
+
 VEX Shell use deterministic file context management system, in a nutshell I can 
 describe it as "Mark once, hot-reload forever". 
 
@@ -35,7 +36,3 @@ if file_context:
             id=last_msg.id,
         )
 ```
-
-## References
-1. [cat_tool](../src/utils/tools.py)
-1. [file context update](../src/utils/fs.py)
