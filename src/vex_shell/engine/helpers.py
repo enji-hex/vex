@@ -25,14 +25,14 @@ from langchain.messages import (
     ToolCall
 )
 from langgraph.prebuilt import ToolNode
-from tools.tools import tools
+from vex_shell.tools.tools import tools
 import openai
 import re
 import json
 import uuid
 
-from utils.config import Settings,LOGGER
-from utils.fs import FileData
+from vex_shell.utils.config import Settings,LOGGER
+from .state import FileData
 
 
 

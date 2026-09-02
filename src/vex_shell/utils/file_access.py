@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 from pathlib import Path
 from typing import List, Literal, Optional
-from utils.config import Settings
+from .config import Settings
 import fnmatch
 
 

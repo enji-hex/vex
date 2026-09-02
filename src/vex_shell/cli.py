@@ -3,15 +3,15 @@ import asyncio
 from importlib import resources
 from pathlib import Path
 import sys
-from typing import Dict
 
 from rich.console import Console
-from ui import colors
-from utils import config
-from utils.file_access import file_access_control
-import sqlite3
-import engine.core as core
-import uuid_utils
+from vex_shell.ui import colors
+from vex_shell.utils import config
+from vex_shell.utils.file_access import file_access_control
+from vex_shell.engine.agent import Agent
+import vex_shell.engine.core as core
+from vex_shell.engine import core
+
 
 def init_workspace(console: Console, home: bool = False) -> None:
     vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
@@ -26,7 +26,6 @@ def init_workspace(console: Console, home: bool = False) -> None:
 
     # set default .env only for home
     if home: (vex_dir / ".env").write_text('VEX_API_KEY=""')
-
     console.print(
         f"[vex.success]✓[/vex.success] New .vex folder initialized at "
         f"[vex.prompt]{vex_dir.absolute()}[/vex.prompt]"
@@ -36,21 +35,51 @@ def init_workspace(console: Console, home: bool = False) -> None:
         "Set API keys and adjust settings for your requirements.[/vex.muted]"
     )
 
+async def list_sessions(agent:Agent, console: Console) -> None:
+    ids = await agent.get_sessions()
+    console.print(f"[vex.success][✓] Saved Session[/vex.success] DB_PATH: {agent.settings.db_path}")
+    for id in ids:
+        console.print(f"- {id}")
 
-def list_sessions(db_path: str, console: Console) -> None:
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.execute(
-            "SELECT DISTINCT thread_id FROM checkpoints ORDER BY thread_id"
-        )
-        rows = cursor.fetchall()
-        ids = [r[0] for r in rows if r[0] is not None]
+async def run_agent(args):
+    console = Console(theme=colors.FALLOUT.to_rich_theme())
+    if args.init:
+        init_workspace(console=console)
+        return
+    if args.reset:
+        (Path.cwd() / ".vex" / "session.db").unlink(missing_ok=True)
+        return
+    if args.reset_global:
+        (Path.home() / ".vex" / "session.db").unlink(missing_ok=True)
+        return
 
+    # no args , init systemwide config
+    vex_dir = Path.cwd() / ".vex"
+    if not Path.exists(vex_dir):
+        init_workspace(console=console, home=True)
+
+    settings = config.Settings()
+    file_access_control.reconfigure(settings)
+
+    tools,mcp_manager = await core.get_tools(settings)
+    graph = core.build_graph(settings, tools)
+    agent = await Agent.create(graph, args.session, settings, mcp_manager)
+
+    try:
+        if args.list_sessions:
+            await list_sessions(agent,console)
+            return
+
+        from vex_shell.ui.console import start_session
+        await start_session(agent, console)
+    except (KeyboardInterrupt, asyncio.CancelledError):
         console.print(
-            f"[vex.success][✓] Saved Session[/vex.success] DB_PATH: {db_path}"
+            "\n[yellow]Session interrupted by user. Shutting down...[/yellow]"
         )
-        for id in ids:
-            console.print(f"- {id}")
-
+    except Exception as e:
+        console.print(f"\n[red]Unexpected error: {e}[/red]")
+    finally:
+        await agent.close()
 
 def cli() -> None:
     parser = argparse.ArgumentParser(
@@ -75,36 +104,7 @@ def cli() -> None:
         help="reset global sqlite database (in user home)",
     )
     args = parser.parse_args()
-
-    console = Console(theme=colors.FALLOUT.to_rich_theme())
-
-    if args.init:
-        init_workspace(console=console)
-        sys.exit(0)
-    if args.reset:
-        (Path.cwd() / ".vex" / "session.db").unlink(missing_ok=True)
-        sys.exit(0)
-    if args.reset_global:
-        (Path.home() / ".vex" / "session.db").unlink(missing_ok=True)
-        sys.exit(0)
-
-    # no args , init systemwide config
-    vex_dir = Path.cwd() / ".vex"
-    if not Path.exists(vex_dir):
-        init_workspace(console=console, home=True)
-
-    settings = config.Settings()
-    file_access_control.reconfigure(settings)
-    config.LOGGER.info(
-        f"Read prefixes: {file_access_control.read_patterns} | "
-        f"Write prefixes: {file_access_control.write_patterns}"
-    )
-
-    if args.list_sessions:
-        list_sessions(settings.db_path, console)
-        sys.exit(0)
-
-    asyncio.run(core.run_agent(console, settings, args.session))
+    asyncio.run(run_agent(args))
 
 
 if __name__ == "__main__":

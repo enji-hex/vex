@@ -24,13 +24,13 @@ from langchain.messages import (
     ToolCall,
 )
 from langgraph.prebuilt import ToolNode
-from tools.tools import tools
+from vex_shell.tools.tools import tools
 
-from utils.config import Settings, LOGGER
-from utils.file_access import file_access_control
+from vex_shell.utils.config import Settings, LOGGER
+from vex_shell.utils.file_access import file_access_control
 
 from .state import State
-from utils.fs import sync_loaded_files,sync_cwd_tree
+from vex_shell.utils.fs import sync_loaded_files,sync_cwd_tree
 from .helpers import (
     get_safe_window,
     format_file_context,

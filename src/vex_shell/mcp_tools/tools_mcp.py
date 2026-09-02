@@ -11,7 +11,7 @@ import time
 import json, os
 from pydantic import BaseModel, Field, create_model
 
-from utils.config import LOGGER
+from vex_shell.utils.config import LOGGER
 
 # JSON mcp types to python types
 JSON_TYPE_MAP: dict[str, type] = {

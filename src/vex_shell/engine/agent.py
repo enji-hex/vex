@@ -14,15 +14,11 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import aiosqlite
 from fnmatch import fnmatch
 
-
-from utils.file_access import file_access_control
-
-from mcp_tools.tools_mcp import MCPManager
-
-from utils.config import LOGGER,Settings
-from ui import prompt
-from ui.events import *
-from tools.tools import _glob_tool,_read_files
+from vex_shell.utils.file_access import file_access_control
+from vex_shell.mcp_tools.tools_mcp import MCPManager
+from vex_shell.utils.config import LOGGER,Settings
+from vex_shell.ui.events import *
+from vex_shell.tools.tools import _glob_tool,_read_files
 
 warnings.filterwarnings("ignore", message=".*v3 streaming protocol.*")
 
@@ -128,6 +124,14 @@ class Agent:
     
     async def get_state(self):
         return await self.graph.aget_state(self.config)
+    
+    async def get_sessions(self) -> List[str]:
+        cusrsor = await self.conn.execute(
+            "SELECT DISTINCT thread_id FROM checkpoints ORDER BY thread_id"
+        )
+        rows = await cusrsor.fetchall()
+        ids = [r[0] for r in rows if r[0] is not None]
+        return ids
     
     async def read_files(self,pattern:str) -> List[str]:
         current_state = await self.get_state()

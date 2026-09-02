@@ -1723,7 +1723,7 @@ wheels = [
 
 [[package]]
 name = "vex-shell"
-version = "0.2.7.9"
+version = "0.2.7.10"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
@@ -1738,10 +1738,14 @@ dependencies = [
     { name = "mcp" },
     { name = "pathspec" },
     { name = "pillow" },
-    { name = "prompt-toolkit" },
     { name = "pydantic-settings" },
-    { name = "rich" },
     { name = "selectolax" },
+]
+
+[package.optional-dependencies]
+cli = [
+    { name = "prompt-toolkit" },
+    { name = "rich" },
 ]
 
 [package.metadata]
@@ -1758,11 +1762,12 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.0.0" },
     { name = "pathspec", specifier = ">=1.1.1" },
     { name = "pillow", specifier = ">=12.3.0" },
-    { name = "prompt-toolkit", specifier = ">=3.0.52" },
+    { name = "prompt-toolkit", marker = "extra == 'cli'", specifier = ">=3.0.52" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
-    { name = "rich", specifier = ">=15.0.0" },
+    { name = "rich", marker = "extra == 'cli'", specifier = ">=15.0.0" },
     { name = "selectolax", specifier = ">=0.4.11" },
 ]
+provides-extras = ["cli"]
 
 [[package]]
 name = "wcwidth"

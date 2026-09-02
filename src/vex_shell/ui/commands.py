@@ -1,15 +1,10 @@
 import sys, os
 from enum import Enum, auto
-from typing import Text
-
 from rich.box import SQUARE
 from rich.console import Console
 from rich.panel import Panel
-from rich.live import Live
-from utils import config
-from langgraph.graph.state import CompiledStateGraph, StateGraph
+from vex_shell.engine.agent import Agent
 
-from engine.stream_processor import Agent
 
 class CliOutput(Enum):
     RES_EXIT = auto()  # requrie app exit
@@ -19,8 +14,10 @@ class CliOutput(Enum):
 def wait_for_key():
     if os.name == "nt":
         import msvcrt
+
         msvcrt.getch()
-        while msvcrt.kbhit(): msvcrt.getch()
+        while msvcrt.kbhit():
+            msvcrt.getch()
     else:
         import tty, termios, select
 
@@ -34,21 +31,23 @@ def wait_for_key():
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
-def _get_state_str(b:bool):
+
+def _get_state_str(b: bool):
     return "enabled" if b else "disabled"
+
 
 def show_transient_panel(content: str, title: str, console: Console):
     """Displays a popup panel that self-destructs after a keypress."""
-    
+
     panel = Panel(
-            content,
-            title=title,
-            title_align="left",
-            box=SQUARE,
-            border_style="vex.prompt",
-            expand=False,
-            width=max(console.width - 2, 20),
-        )
+        content,
+        title=title,
+        title_align="left",
+        box=SQUARE,
+        border_style="vex.prompt",
+        expand=False,
+        width=max(console.width - 2, 20),
+    )
     console.show_cursor(False)
     try:
         with console.screen():
@@ -59,19 +58,24 @@ def show_transient_panel(content: str, title: str, console: Console):
         console.file.flush()
 
 
-async def cli_command(cmd:str, 
-                agent:Agent,
-                console,
-                ) -> CliOutput:
+async def cli_command(
+    cmd: str,
+    agent: Agent,
+    console,
+) -> CliOutput:
     if cmd == "/q":
         return CliOutput.RES_EXIT
     if cmd == "/stat":
-        use_mcp = agent.settings.chat['use_mcp']
+        use_mcp = agent.settings.chat["use_mcp"]
         token_usage = agent.token_usage
-        model_name = agent.settings.model['name']
+        model_name = agent.settings.model["name"]
         # Yes it's crutches
-        autosync_cwd_tree = _get_state_str(agent.settings.chat.get('autosync_cwd_tree',False))
-        cache_on_write    = _get_state_str(agent.settings.chat.get('cache_on_write',False))
+        autosync_cwd_tree = _get_state_str(
+            agent.settings.chat.get("autosync_cwd_tree", False)
+        )
+        cache_on_write = _get_state_str(
+            agent.settings.chat.get("cache_on_write", False)
+        )
 
         mcp_state = "enabled" if use_mcp == True else "disabled"
         left_padding = 20
@@ -83,18 +87,21 @@ async def cli_command(cmd:str,
             f"{'MCP:':<{left_padding}}{mcp_state}\n"
             f"{'CWD auto tree:':<{left_padding}}{autosync_cwd_tree}\n"
             f"{'Cache on Write:':<{left_padding}}{cache_on_write}\n"
-            
         )
         show_transient_panel(content, "Usage Metrics", console)
         return CliOutput.RES_SKIP
-    
+
     if cmd == "/env":
-        show_transient_panel((
-            f'{'Current workspace directory: ':<30}{agent.settings.config_path}\n'
-            f'{'Current env path: ':<30}{agent.settings.env_path}'
-            ),"Env Info",console)
+        show_transient_panel(
+            (
+                f"{'Current workspace directory: ':<30}{agent.settings.config_path}\n"
+                f"{'Current env path: ':<30}{agent.settings.env_path}"
+            ),
+            "Env Info",
+            console,
+        )
         return CliOutput.RES_SKIP
-    
+
     if cmd == "/help":
         content = (
             "██╗   ██╗███████╗██╗  ██╗\n"
@@ -114,31 +121,31 @@ async def cli_command(cmd:str,
         return CliOutput.RES_SKIP
 
     if cmd == "/cached":
-        state  = await agent.get_state()
-        loaded = state.values.get("loaded_files",{})
+        state = await agent.get_state()
+        loaded = state.values.get("loaded_files", {})
         cached = list(loaded.keys())
 
         if not cached:
             content = "No files are currently cached in the active working context."
         else:
             content = "Cached files:\n" + "\n".join(f"- {p}" for p in cached)
-        show_transient_panel(content,"Cached Files",console)
+        show_transient_panel(content, "Cached Files", console)
         return CliOutput.RES_SKIP
-    
+
     if cmd.startswith("/read"):
-        pattern = cmd.split('/read')[-1].strip()
+        pattern = cmd.split("/read")[-1].strip()
 
         msgs = await agent.read_files(pattern)
-        show_transient_panel('\n'.join(msgs),f'Manual Read {pattern}',console)
+        show_transient_panel("\n".join(msgs), f"Manual Read {pattern}", console)
         return CliOutput.RES_SKIP
-    
+
     if cmd.startswith("/del"):
-        pattern = cmd.split('/del')[-1].strip()
+        pattern = cmd.split("/del")[-1].strip()
 
         msgs = await agent.purge_files(pattern)
-        show_transient_panel('\n'.join(msgs),f'Manual Cache Clear {pattern}',console)
+        show_transient_panel("\n".join(msgs), f"Manual Cache Clear {pattern}", console)
         return CliOutput.RES_SKIP
-    
+
     # Feedback for unrecognized slash commands
     if cmd.startswith("/"):
         show_transient_panel(

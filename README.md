@@ -23,7 +23,7 @@ VEX is a **terminal‑first AI agent** that keeps your workspace in sync while y
 - **Sliding‑window context manager**  keeps prompts within model limits.
 - **Dynamic MCP tool loading** – plug‑in external tools at runtime via MCP (`.vex/mcp_config.json`).
 - **Rich UI theming** – three ready‑made palettes (Fallout, Cyberpunk, EVA‑03) built on Rich.
-- **Sub‑second local response** – LLM calls return in under a second thanks to token‑budgeted prompts and async I/O.
+
 
 ## Quick Start
 ```bash

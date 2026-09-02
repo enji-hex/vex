@@ -1,10 +1,9 @@
-import os
 from pathlib import Path
-from typing import TypedDict
-from utils.config import LOGGER
-from utils.file_access import file_access_control
-from tools.tools import _tree_tool
-from engine.state import FileData
+
+from .config import LOGGER
+from .file_access import file_access_control
+from vex_shell.tools.tools import _tree_tool
+from vex_shell.engine.state import FileData
 
 
 def sync_cwd_tree():
