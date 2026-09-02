@@ -57,6 +57,7 @@ async def run_agent(args):
     vex_dir = Path.cwd() / ".vex"
     if not Path.exists(vex_dir):
         init_workspace(console=console, home=True)
+        return
 
     settings = config.Settings()
     file_access_control.reconfigure(settings)
