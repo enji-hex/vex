@@ -17,7 +17,7 @@ def init_workspace(console: Console, home: bool = False) -> None:
     vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
     vex_dir.mkdir(parents=True, exist_ok=True)
 
-    for file in resources.files("templates").iterdir():
+    for file in resources.files("vex_shell.templates").iterdir():
         if file.is_dir() or file.name == "__init__.py":
             continue
 
