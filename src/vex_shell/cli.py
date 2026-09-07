@@ -42,7 +42,15 @@ async def list_sessions(agent:Agent, console: Console) -> None:
         console.print(f"- {id}")
 
 async def run_agent(args):
-    console = Console(theme=colors.FALLOUT.to_rich_theme())
+    settings = config.Settings()
+    file_access_control.reconfigure(settings)
+
+    theme_name = settings.chat.get('theme','Fallout 3 Dark Mode')
+    sel_theme,themes = colors.load_theme(theme_name)
+    if not sel_theme:
+        raise Exception(f'Error theme {theme_name} doesnt exists in themes.csv')
+    
+    console = Console(theme=sel_theme.to_rich_theme())
     if args.init:
         init_workspace(console=console)
         return
@@ -52,6 +60,11 @@ async def run_agent(args):
     if args.reset_global:
         (Path.home() / ".vex" / "session.db").unlink(missing_ok=True)
         return
+    if args.list_themes:
+        console.print(f"[vex.success][✓] Available themes[/vex.success]")
+        for id in themes:
+            console.print(f"- {id}")
+        return
 
     # no args , init systemwide config
     vex_dir = Path.cwd() / ".vex"
@@ -59,13 +72,11 @@ async def run_agent(args):
         init_workspace(console=console, home=True)
         return
 
-    settings = config.Settings()
-    file_access_control.reconfigure(settings)
-
+    
     tools,mcp_manager = await core.get_tools(settings)
     graph = core.build_graph(settings, tools)
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
-
+    
     try:
         if args.list_sessions:
             await list_sessions(agent,console)
@@ -94,6 +105,9 @@ def cli() -> None:
     )
     parser.add_argument(
         "--session", "-s", default="default", help="Initialize .vex project"
+    )
+    parser.add_argument(
+        "--list-themes", "-lt",action="store_true", help="List available color schemes"
     )
     parser.add_argument(
         "--list-sessions", "-ls", action="store_true", help="List saved sessions"

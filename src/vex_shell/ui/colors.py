@@ -1,6 +1,10 @@
 from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Tuple
 from rich.theme import Theme
-
+from importlib import resources
+import csv
+from vex_shell.utils.config import LOGGER
 
 @dataclass
 class Palette:
@@ -22,27 +26,26 @@ class Palette:
             }
         )
 
+def load_theme(theme_name:str) -> Tuple[Palette | None, List[str]]:
+    user_themes     = Path().home() / ".vex" / "themes.csv"
+    themes = []
+    sel_theme = None
 
-EVA_03 = Palette(
-    name="EVA-03",
-    primary="#9d4edd",  # Unit-03 Violet
-    accent="#ff3b00",  # Infected Orange-Red
-    success="#00ff66",  # Toxic Green
-    muted="#727d85",  # Dark Steel Grey
-)
+    if user_themes.exists():
+        LOGGER.info(f'load user themes.csv')
+        file = user_themes.read_text()
+    else:
+        file = (
+            resources.files('vex_shell.templates')
+            .joinpath('themes.csv')
+            .read_text(encoding='utf-8')
+        )
 
-CYBERPUNK = Palette(
-    name="Cyberpunk",
-    primary="#ff007f",
-    accent="#00f0ff",
-    success="#00ff66",
-    muted="#6272a4",
-)
+    reader = csv.DictReader(file.splitlines(),delimiter=',')
+    for row in reader:
+        themes.append(row['name'])
+        if row['name'] == theme_name:
+            sel_theme =  Palette(**row)
+    
+    return sel_theme,themes
 
-FALLOUT = Palette(
-    name="Fallout 3 Dark Mode",
-    primary="#18FF62",  # Bright HUD text green
-    accent="#00CC44",  # Deep green for active states / buttons
-    success="#39FF14",  # High-visibility neon green
-    muted="#5A5A5A",  # Mid-tone dark green for secondary text / borders
-)

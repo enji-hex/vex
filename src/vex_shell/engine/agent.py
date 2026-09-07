@@ -120,7 +120,10 @@ class Agent:
         await checkpointer.setup()
         compiled_graph = graph.compile(checkpointer=checkpointer)
 
-        return cls(compiled_graph,session_id,settings,conn,mcp_manager)
+        agent =  cls(compiled_graph,session_id,settings,conn,mcp_manager)
+        await agent.restore_token_usage()
+
+        return agent
 
     
     async def get_state(self):
@@ -192,6 +195,7 @@ class Agent:
 
 
     async def restore_token_usage(self) -> TokenUsage:
+        """Restore token usage for message history"""
         current_state = await self.get_state()
 
         # empty token usage

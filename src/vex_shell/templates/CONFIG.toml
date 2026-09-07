@@ -1,5 +1,3 @@
-# last template
-
 [chat]
 # control imported MCP tools only, core tools available always
 use_mcp =  false
@@ -8,12 +6,13 @@ use_mcp =  false
 load_last_n =  10
 
 # keep/hide tool-info boxes
-keep_tool_logs =  true
+keep_tool_logs =  false
 # optional, ignored if empty
 custom_cwd = ""
 autosync_cwd_tree = true 
 # Auto read each file written by LLM
 cache_on_write    = true
+theme = "Land-of-Ooo"
 
 [verification]
 check_command = ""
@@ -27,13 +26,14 @@ observe_command = ""
 
 # you can set even not existing directories, agent will create it automatically
 read_patterns = ['**/*']
-write_patterns = []
+write_patterns = ['./docs/**']
 
 [model]
 # ollama / openrouter
 provider = "openrouter"
 # optional 
 # llm_url = "http://localhost:11434/v1" 
+
 
 use_vision = false # image read support
 # name = "openai/gpt-oss-120b"
