@@ -24,17 +24,27 @@ from langchain.messages import (
     ToolMessage,
     ToolCall
 )
-from langgraph.prebuilt import ToolNode
 from vex_shell.tools.tools import tools
-import openai
-import re
 import json
 import uuid
 
-from vex_shell.utils.config import Settings,LOGGER
-from .state import FileData
+from vex_shell.utils.config import LOGGER
+from .state import State
+import requests
 
-
+def get_model_context_length(model_id: str) -> Optional[int]:
+    """Gather max_token_context for specified LLM"""
+    try:
+        res = requests.get("https://openrouter.ai/api/v1/models")
+        if res.status_code == 200:
+            data = res.json().get("data", [])
+            LOGGER.info(str(data))
+            for m in data:
+                if m.get("id") == model_id:
+                    return m.get("context_length")
+    except Exception:
+        return None
+    
 
 def get_safe_window(messages:list, target_window:int) -> list:
     if target_window != -1 and len(messages) > target_window:
@@ -51,7 +61,8 @@ def get_safe_window(messages:list, target_window:int) -> list:
         if isinstance(msg,ToolMessage):
             tool_name = msg.name
             if len(msg.content) > 200 and tool_name != "tree_tool":
-                # truncate long ToolCall messages
+                # We can't delete tool call message, but 
+                # we can truncate long ToolCall messages
                 msg = ToolMessage(
                     content=f"[Output truncated: {msg.content[:100]}...]",
                     tool_call_id=msg.tool_call_id,
@@ -62,9 +73,8 @@ def get_safe_window(messages:list, target_window:int) -> list:
     return pruned
 
 def format_file_context(
+        state:State,
         env_block:str,
-        loaded_files: Dict[str, FileData],
-        cwd_tree:Optional[str],
         use_vision:bool
     ) -> List[Dict[str,Any]]:
 
@@ -74,6 +84,10 @@ def format_file_context(
         f"--- ACTIVE WORKING CONTEXT (GROUND TRUTH) ---\n"
         f"### Active Working Context (Latest File Versions)\n"
     )
+
+    loaded_files = state.get("loaded_files")
+    cwd_tree     = state.get('cwd_tree')
+    LOGGER.info(f'cwd_tree {cwd_tree}')
     
     content_blocks.append({"type":"text","text":header_text})
     for path, info in loaded_files.items():

@@ -54,21 +54,20 @@ async def llm_call_node(
 
     # sync all loaded files
     new_files_snap = sync_loaded_files(state.get("loaded_files", {}))
-    new_cwd_tree  = sync_cwd_tree() if settings.chat.get('autosync_cwd_tree',False) else None
-    LOGGER.info(f"cached files {str(', '.join([f for f in new_files_snap.keys()]))}")
+    cwd_tree       = sync_cwd_tree(state) if settings.chat.get('autosync_cwd_tree',False) else None
+    LOGGER.info(f'cwd tree {cwd_tree}')
 
     # handle sliding window
     window: int = llm_cfg.get("context_sliding_window", -1)
     recent = get_safe_window(state["messages"], window)
-
+    
     system_msg = SystemMessage(content=settings.system_prompt)
 
     # Handle file_context
     env_block = file_access_control.build_environment_context()
     context_blocks: list = format_file_context(
+        state,
         env_block,
-        new_files_snap,
-        new_cwd_tree,
         config.get("configurable", {}).get("use_vision", False),
     )
 
@@ -139,6 +138,7 @@ async def llm_call_node(
         "messages": [resp],
         "llm_calls": current_calls,
         "loaded_files": new_files_snap,
+        "cwd_tree":cwd_tree,
     }
 
 

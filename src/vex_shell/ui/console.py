@@ -22,6 +22,7 @@ from langchain_core.messages import (
 )
 
 from vex_shell.utils.config import LOGGER
+from vex_shell.utils.fs import sync_cwd_tree
 from vex_shell.ui import prompt
 from vex_shell.ui.commands import cli_command, CliOutput
 from vex_shell.ui.events import *

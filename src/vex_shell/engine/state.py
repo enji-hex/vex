@@ -18,8 +18,8 @@ def merge_dict_state(left: dict | None, right: dict | None) -> dict:
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     loaded_files: Annotated[Dict[str, FileData],merge_dict_state]
+    cwd_tree: str
     llm_calls: int
-
 
 class FileData(TypedDict):
     content: str

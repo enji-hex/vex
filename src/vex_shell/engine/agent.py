@@ -20,6 +20,7 @@ from vex_shell.mcp_tools.tools_mcp import MCPManager
 from vex_shell.utils.config import LOGGER,Settings
 from vex_shell.ui.events import *
 from vex_shell.tools.tools import _glob_tool,_read_files
+from vex_shell.engine.helpers import get_model_context_length
 
 warnings.filterwarnings("ignore", message=".*v3 streaming protocol.*")
 
@@ -92,12 +93,14 @@ class Agent:
         session_id: str,
         settings: Settings,
         conn: aiosqlite.Connection,
+        max_context_window:int,
         mcp_manager: Optional[MCPManager] = None,
     ) -> None:
         self.graph = compiled_graph
         self.settings = settings
         self.mcp_manager = mcp_manager
         self.conn = conn
+        self.settings.model['max_context_window'] = max_context_window
         self.config: RunnableConfig = {
             "configurable": {
                 "thread_id": session_id,
@@ -120,9 +123,16 @@ class Agent:
         await checkpointer.setup()
         compiled_graph = graph.compile(checkpointer=checkpointer)
 
-        agent =  cls(compiled_graph,session_id,settings,conn,mcp_manager)
-        await agent.restore_token_usage()
+        _context_window = None
+        if settings.model['provider'] == 'openrouter':
+            _context_window = get_model_context_length(settings.model['name'])
+        
+        # gather only for open router models
+        max_context_window = _context_window if _context_window else 128_000 
 
+
+        agent =  cls(compiled_graph,session_id,settings,conn,max_context_window,mcp_manager)
+        await agent.restore_token_usage()
         return agent
 
     

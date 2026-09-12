@@ -1,10 +1,19 @@
 import sys, os
 from enum import Enum, auto
+from typing import Dict, List
 from rich.box import SQUARE
 from rich.console import Console
 from rich.panel import Panel
 from vex_shell.engine.agent import Agent
+from vex_shell.engine.state import FileData
 
+from vex_shell.utils.config import LOGGER
+import tiktoken
+
+
+def count_tokens(text:str):
+    _ENC = tiktoken.get_encoding("cl100k_base")
+    return len(_ENC.encode(text))
 
 class CliOutput(Enum):
     RES_EXIT = auto()  # requrie app exit
@@ -66,9 +75,9 @@ async def cli_command(
     if cmd == "/q":
         return CliOutput.RES_EXIT
     if cmd == "/stat":
-        use_mcp = agent.settings.chat["use_mcp"]
+        use_mcp     = agent.settings.chat["use_mcp"]
         token_usage = agent.token_usage
-        model_name = agent.settings.model["name"]
+        model_name  = agent.settings.model["name"]
         # Yes it's crutches
         autosync_cwd_tree = _get_state_str(
             agent.settings.chat.get("autosync_cwd_tree", False)
@@ -80,7 +89,7 @@ async def cli_command(
         mcp_state = "enabled" if use_mcp == True else "disabled"
         left_padding = 20
         content = (
-            f"\n{'Input:':<{left_padding}}{token_usage.tok_in} | "
+            f"{'Input:':<{left_padding}}{token_usage.tok_in} | "
             f"Output: {token_usage.tok_out} | "
             f"Total: {token_usage.tok_total}\n"
             f"{'Model:':<{left_padding}}{model_name}\n"
@@ -88,6 +97,39 @@ async def cli_command(
             f"{'CWD auto tree:':<{left_padding}}{autosync_cwd_tree}\n"
             f"{'Cache on Write:':<{left_padding}}{cache_on_write}\n"
         )
+
+        # get Active context data
+        MAX_WINDOW = agent.settings.model["max_context_window"]
+
+        state = await agent.get_state()
+        loaded:Dict[str,FileData] = state.values.get("loaded_files", {})
+        cwd_tree = state.values.get("cwd_tree", "")
+
+        cached = list(loaded.keys())
+        content += "\n[vex.prompt]ActiveContext[/vex.prompt]\n"
+        total_tokens = 0
+        
+        LABEL_W = 26
+        TOK_W = 8
+
+        if loaded:
+            file_text = "".join([f"{k}\n{v['content']}" for k, v in loaded.items()])
+            file_tokens = count_tokens(file_text)
+            total_tokens += file_tokens
+            
+            label = f"Files Context ({len(loaded)} files)"
+            tok_str = f"~{file_tokens:,}"
+            content += f"< {label:<{LABEL_W}} {tok_str:>{TOK_W}} tokens >\n"
+
+        if cwd_tree:
+            tree_tokens = count_tokens(cwd_tree)
+            total_tokens += tree_tokens
+            
+            tok_str = f"~{tree_tokens:,}"
+            content += f"< {'CwdTree':<{LABEL_W}} {tok_str:>{TOK_W}} tokens >\n"
+        
+        pct_used = (total_tokens / MAX_WINDOW) * 100
+        content += f"\nTotal Context: ~{total_tokens:,} / {MAX_WINDOW:,} tokens ({pct_used:.1f}%)"
         show_transient_panel(content, "Usage Metrics", console)
         return CliOutput.RES_SKIP
 
@@ -116,6 +158,7 @@ async def cli_command(
             "  /q    - Quit session\n"
             "  /stat - Show token usage\n"
             "  /help - Show help menu\n"
+            "  /cached - Shows all cached files\n"
         )
         show_transient_panel(content, "Help", console)
         return CliOutput.RES_SKIP
@@ -132,6 +175,7 @@ async def cli_command(
         show_transient_panel(content, "Cached Files", console)
         return CliOutput.RES_SKIP
 
+    
     if cmd.startswith("/read"):
         pattern = cmd.split("/read")[-1].strip()
 

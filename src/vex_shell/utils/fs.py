@@ -5,9 +5,13 @@ from .file_access import file_access_control
 from vex_shell.tools.tools import _tree_tool
 from vex_shell.engine.state import FileData
 
+from vex_shell.engine.state import State
 
-def sync_cwd_tree():
+def sync_cwd_tree(state: State) -> str:
+    """Update cwd_tree in Agent State"""
+
     new_tree = _tree_tool(file_access_control.cwd)
+    state.update({"cwd_tree":new_tree})
     return new_tree
 
 def sync_loaded_files(loaded_files: dict[str, FileData]) -> dict[str, FileData]:
