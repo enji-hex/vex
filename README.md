@@ -130,7 +130,7 @@ Full agent functionality out of the box!!
 | `/q` | Quit the current VEX session. |
 
 ## Additional Documentation
-- [File Context Management](./docs/file_context_management.md)
+- [Agentic Awareness](./docs/agentic_awareness.md)
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.
