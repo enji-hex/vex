@@ -165,11 +165,18 @@ async def start_session(
     keep_tool_logs: bool = not agent.settings.chat["keep_tool_logs"]
     await restore_history(agent, console)
 
-    commands = ["/q", "/help", "/stat", "/env", "/cached", "/read", "/del"]
+    commands = ["/q", "/help", "/stat", "/env", "/cached", "/read", "/del","/voice"]
     prompt_session = prompt.Prompt(console, commands)
 
+    user_input_default = ""
     while True:
-        user_input = await prompt_session.ask("\n[vex.prompt]SHELL > [/vex.prompt]")
+        
+        user_input = await prompt_session.ask(
+            "\n[vex.prompt]SHELL > [/vex.prompt]",
+            # pass recorded string in user input if exists
+            default=user_input_default) 
+        user_input_default = ""
+
         if not user_input:
             continue
 
@@ -177,11 +184,17 @@ async def start_session(
         if user_input.startswith("/"):
             sys.stdout.write("\x1b[1A\x1b[2K")
             sys.stdout.flush()
-            cmd_resp = await cli_command(user_input.lower(), agent, console)
-            if cmd_resp == CliOutput.RES_SKIP:
+            cmd_resp = await cli_command(user_input.lower(), agent, console,prompt_session.prompt_session)
+            if isinstance(cmd_resp,CliOutput):
+                if cmd_resp == CliOutput.RES_SKIP:
+                    continue
+                if cmd_resp == CliOutput.RES_EXIT:
+                    break
+            else:
+                # /voice
+                user_input_default = cmd_resp
+                LOGGER.info(f'user transcription {cmd_resp}')
                 continue
-            if cmd_resp == CliOutput.RES_EXIT:
-                break
 
         # clean history
         LOGGER.info(f'user: {user_input.replace("\n"," ")}')

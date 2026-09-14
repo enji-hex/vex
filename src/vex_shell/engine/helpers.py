@@ -38,7 +38,6 @@ def get_model_context_length(model_id: str) -> Optional[int]:
         res = requests.get("https://openrouter.ai/api/v1/models")
         if res.status_code == 200:
             data = res.json().get("data", [])
-            LOGGER.info(str(data))
             for m in data:
                 if m.get("id") == model_id:
                     return m.get("context_length")

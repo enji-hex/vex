@@ -1,6 +1,8 @@
+import asyncio
 import sys, os
 from enum import Enum, auto
 from typing import Dict, List
+import prompt_toolkit
 from rich.box import SQUARE
 from rich.console import Console
 from rich.panel import Panel
@@ -11,9 +13,10 @@ from vex_shell.utils.config import LOGGER
 import tiktoken
 
 
-def count_tokens(text:str):
+def count_tokens(text: str):
     _ENC = tiktoken.get_encoding("cl100k_base")
     return len(_ENC.encode(text))
+
 
 class CliOutput(Enum):
     RES_EXIT = auto()  # requrie app exit
@@ -70,14 +73,15 @@ def show_transient_panel(content: str, title: str, console: Console):
 async def cli_command(
     cmd: str,
     agent: Agent,
-    console,
-) -> CliOutput:
+    console:Console,
+    prompt_session:prompt_toolkit.PromptSession
+) -> CliOutput | str:
     if cmd == "/q":
         return CliOutput.RES_EXIT
     if cmd == "/stat":
-        use_mcp     = agent.settings.chat["use_mcp"]
+        use_mcp = agent.settings.chat["use_mcp"]
         token_usage = agent.token_usage
-        model_name  = agent.settings.model["name"]
+        model_name = agent.settings.model["name"]
         # Yes it's crutches
         autosync_cwd_tree = _get_state_str(
             agent.settings.chat.get("autosync_cwd_tree", False)
@@ -102,13 +106,13 @@ async def cli_command(
         MAX_WINDOW = agent.settings.model["max_context_window"]
 
         state = await agent.get_state()
-        loaded:Dict[str,FileData] = state.values.get("loaded_files", {})
+        loaded: Dict[str, FileData] = state.values.get("loaded_files", {})
         cwd_tree = state.values.get("cwd_tree", "")
 
         cached = list(loaded.keys())
         content += "\n[vex.prompt]ActiveContext[/vex.prompt]\n"
         total_tokens = 0
-        
+
         LABEL_W = 26
         TOK_W = 8
 
@@ -116,7 +120,7 @@ async def cli_command(
             file_text = "".join([f"{k}\n{v['content']}" for k, v in loaded.items()])
             file_tokens = count_tokens(file_text)
             total_tokens += file_tokens
-            
+
             label = f"Files Context ({len(loaded)} files)"
             tok_str = f"~{file_tokens:,}"
             content += f"< {label:<{LABEL_W}} {tok_str:>{TOK_W}} tokens >\n"
@@ -124,10 +128,10 @@ async def cli_command(
         if cwd_tree:
             tree_tokens = count_tokens(cwd_tree)
             total_tokens += tree_tokens
-            
+
             tok_str = f"~{tree_tokens:,}"
             content += f"< {'CwdTree':<{LABEL_W}} {tok_str:>{TOK_W}} tokens >\n"
-        
+
         pct_used = (total_tokens / MAX_WINDOW) * 100
         content += f"\nTotal Context: ~{total_tokens:,} / {MAX_WINDOW:,} tokens ({pct_used:.1f}%)"
         show_transient_panel(content, "Usage Metrics", console)
@@ -175,7 +179,45 @@ async def cli_command(
         show_transient_panel(content, "Cached Files", console)
         return CliOutput.RES_SKIP
 
-    
+    if cmd == "/voice":
+        task = asyncio.create_subprocess_exec(
+            "v2t",
+            "--stdout",
+            "--silent",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            proc = await task
+        except Exception as err:
+            show_transient_panel(f"v2t program not found err {err}, check https://codeberg.org/Enji/v2t.git "
+                                 "for more details", 
+                                 "Voice Transcription", console)
+            return CliOutput.RES_SKIP
+        
+        while True:
+            line = await proc.stderr.readline()
+            if not line:
+                break
+            LOGGER.info(str(line)+" "+str(line.decode().strip() == "READY"))
+            if line.decode().strip() == "READY":
+                break
+        
+        with console.capture() as cap:
+            console.print("[vex.prompt]Press Enter to stop recording... [/vex.prompt]",end="")
+        prompt_msg = prompt_toolkit.ANSI(cap.get().strip("\r\n"))
+        await prompt_session.prompt_async(prompt_msg)
+
+        console.file.write("\x1b[1A\x1b[2K" * 2)
+        console.file.flush()
+
+        proc.stdin.close()
+        await proc.stdin.wait_closed()
+        
+        stdout_bytes, _ = await proc.communicate()
+        return stdout_bytes.decode().strip()
+
     if cmd.startswith("/read"):
         pattern = cmd.split("/read")[-1].strip()
 
