@@ -55,7 +55,6 @@ async def llm_call_node(
     # sync all loaded files
     new_files_snap = sync_loaded_files(state.get("loaded_files", {}))
     cwd_tree       = sync_cwd_tree(state) if settings.chat.get('autosync_cwd_tree',False) else None
-    LOGGER.info(f'cwd tree {cwd_tree}')
 
     # handle sliding window
     window: int = llm_cfg.get("context_sliding_window", -1)
