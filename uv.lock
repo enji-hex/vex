@@ -1763,7 +1763,7 @@ wheels = [
 
 [[package]]
 name = "vex-shell"
-version = "0.2.8.4"
+version = "0.2.8.5"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
