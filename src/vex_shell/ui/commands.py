@@ -12,6 +12,9 @@ from vex_shell.engine.state import FileData
 from vex_shell.utils.config import LOGGER
 import tiktoken
 
+# voice mode specific 
+import msgspec
+from multiprocessing.connection import Client
 
 def count_tokens(text: str):
     _ENC = tiktoken.get_encoding("cl100k_base")
@@ -43,10 +46,12 @@ def wait_for_key():
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
+def send_msgspec(conn,data):
+    conn.send_bytes(msgspec.json.encode(data))
+
 
 def _get_state_str(b: bool):
     return "enabled" if b else "disabled"
-
 
 def show_transient_panel(content: str, title: str, console: Console):
     """Displays a popup panel that self-destructs after a keypress."""
@@ -180,43 +185,39 @@ async def cli_command(
         return CliOutput.RES_SKIP
 
     if cmd == "/voice":
-        task = asyncio.create_subprocess_exec(
-            "v2t",
-            "--stdout",
-            "--silent",
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            proc = await task
-        except Exception as err:
-            show_transient_panel(f"v2t program not found err {err}, check https://codeberg.org/Enji/v2t.git "
-                                 "for more details", 
-                                 "Voice Transcription", console)
+        if os.name == 'nt':
+            addr,family = r'\\.\pipe\v2t_pipe', 'AF_PIPE'
+        else:
+            addr,family = '/tmp/v2t.sock', 'AF_UNIX'
+        
+        if not os.path.exists(addr):
+            show_transient_panel(
+                "Cannot connect to v2t daemon.\n"
+                "Please make sure 'v2t --daemon' is running in the background.\n\n"
+                "Docs: https://codeberg.org/Enji/v2t",
+                "v2t Connection Error",
+                console
+            )
             return CliOutput.RES_SKIP
         
-        while True:
-            line = await proc.stderr.readline()
-            if not line:
-                break
-            LOGGER.info(str(line)+" "+str(line.decode().strip() == "READY"))
-            if line.decode().strip() == "READY":
-                break
-        
-        with console.capture() as cap:
-            console.print("[vex.prompt]Press Enter to stop recording... [/vex.prompt]",end="")
-        prompt_msg = prompt_toolkit.ANSI(cap.get().strip("\r\n"))
-        await prompt_session.prompt_async(prompt_msg)
+        with Client(addr,family) as conn:
+            send_msgspec(conn,{"function":"transcribe_micro","mode":"pipe"})
+            resp = msgspec.json.decode(conn.recv_bytes())
 
-        console.file.write("\x1b[1A\x1b[2K" * 2)
-        console.file.flush()
+            if resp.get('msg') != "READY":
+                raise Exception(f"error start recording, {resp.get('err')}")
 
-        proc.stdin.close()
-        await proc.stdin.wait_closed()
-        
-        stdout_bytes, _ = await proc.communicate()
-        return stdout_bytes.decode().strip()
+            with console.capture() as cap:
+                console.print("[vex.prompt]Press Enter to stop recording... [/vex.prompt]",end="")
+            prompt_msg = prompt_toolkit.ANSI(cap.get().strip("\r\n"))
+            await prompt_session.prompt_async(prompt_msg)
+
+            console.file.write("\x1b[1A\x1b[2K" * 2)
+            console.file.flush()
+
+            send_msgspec(conn,{"msg":"stop"})
+            resp = msgspec.json.decode(conn.recv_bytes())
+            return resp.get('msg')
 
     if cmd.startswith("/read"):
         pattern = cmd.split("/read")[-1].strip()
