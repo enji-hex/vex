@@ -45,7 +45,7 @@ async def run_agent(args):
     settings = config.Settings()
     file_access_control.reconfigure(settings)
 
-    theme_name = settings.chat.get('theme','Fallout 3 Dark Mode')
+    theme_name = settings.chat.get('theme','Fallout-3-Dark-Mode')
     sel_theme,themes = colors.load_theme(theme_name)
     if not sel_theme:
         raise Exception(f'Error theme {theme_name} doesnt exists in themes.csv')
