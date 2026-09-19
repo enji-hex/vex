@@ -48,6 +48,10 @@ max_completion_tokens = 8000
 timeout =  60
 max_retries = 3
 
+[model.ollama]
+# ollama provider timeout, set to 0 for disabling
+stream_chunk_timeout=0
+
 # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
 [model.reasoning]
 # max_tokens = 2000

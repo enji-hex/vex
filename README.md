@@ -26,6 +26,11 @@ VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*)
 - **Token Tracking & UI Themes** – Built-in /stat metrics and customizable Rich terminal themes (Fallout, Cyberpunk, EVA-03).
 
 
+## TL;DR (News)
+- Added `llama.cpp` support (compatible with any Hugging Face GGUF model).
+- Fixed `extra_body` argument injection for the Ollama provider.
+
+
 ## Quick Start
 
 ### As Tool
@@ -48,6 +53,18 @@ vex --init
 # Start an interactive session (uses the local .vex if present, otherwise the global one)
 vex
 ```
+
+### Provider Configuration Notes
+
+> Both **Ollama** and **llama.cpp** uses ollama as provider, cause of identical `ChatOpenAI` interface.
+
+**Ollama**
+- `custom_url` is optional (defaults to `http://localhost:11434/v1`).
+
+**llama.cpp**
+- Set port to `11434` or update `custom_url` in `CONFIG.toml`.
+- Set `stream_chunk_timeout=0` to disable timeouts and prevent request errors.
+
 
 ### As Python Library
 

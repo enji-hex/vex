@@ -94,6 +94,9 @@ async def llm_call_node(
             model_kwargs=llm_cfg.get("extra_body", {}),
         )
     elif llm_cfg["provider"] == "ollama":
+        stream_chunk_timeout = llm_cfg.get('ollama',{})\
+            .get('stream_chunk_timeout','0')
+        
         llm = ChatOpenAI(
             model=llm_cfg["name"],
             base_url=llm_cfg.get("llm_url", "http://localhost:11434/v1"),
@@ -101,9 +104,10 @@ async def llm_call_node(
             temperature=llm_cfg["temperature"],
             max_completion_tokens=llm_cfg.get("max_completion_tokens"),
             max_retries=int(llm_cfg["max_retries"]),
-            model_kwargs=llm_cfg.get("extra_body", {}),
             streaming=True,
             stream_usage=True,
+            stream_chunk_timeout=int(stream_chunk_timeout),
+            extra_body=llm_cfg.get("extra_body", {}),
         )
     else:
         raise RuntimeError("LLM provider undefined")
