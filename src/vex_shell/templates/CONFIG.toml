@@ -9,7 +9,7 @@ load_last_n =  10
 keep_tool_logs =  false
 # optional, ignored if empty
 custom_cwd = ""
-autosync_cwd_tree = true 
+autosync_cwd_tree = false
 # Auto read each file written by LLM
 cache_on_write    = true
 theme = "Land-of-Ooo"
