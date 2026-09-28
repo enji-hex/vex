@@ -86,7 +86,6 @@ def format_file_context(
 
     loaded_files = state.get("loaded_files")
     cwd_tree     = state.get('cwd_tree')
-    LOGGER.info(f'cwd_tree {cwd_tree}')
     
     content_blocks.append({"type":"text","text":header_text})
     for path, info in loaded_files.items():

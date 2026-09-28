@@ -5,8 +5,7 @@ from pathlib import Path
 import sys
 
 from rich.console import Console
-from vex_shell.ui import colors
-from vex_shell.utils import config
+from vex_shell.cli import colors
 from vex_shell.utils.file_access import file_access_control
 from vex_shell.engine.agent import Agent
 import vex_shell.engine.core as core
@@ -42,6 +41,14 @@ async def list_sessions(agent:Agent, console: Console) -> None:
         console.print(f"- {id}")
 
 async def run_agent(args):
+    # no args , init systemwide config
+    if not Path.exists(Path.home() / ".vex"):
+        console = Console()
+        init_workspace(console=console, home=True)
+        return
+
+
+    from vex_shell.utils import config
     settings = config.Settings()
     file_access_control.reconfigure(settings)
 
@@ -66,12 +73,6 @@ async def run_agent(args):
             console.print(f"- {id}")
         return
 
-    # no args , init systemwide config
-    vex_dir = Path.cwd() / ".vex"
-    if not Path.exists(vex_dir):
-        init_workspace(console=console, home=True)
-        return
-
     
     tools,mcp_manager = await core.get_tools(settings)
     graph = core.build_graph(settings, tools)
@@ -82,9 +83,10 @@ async def run_agent(args):
             await list_sessions(agent,console)
             return
 
-        from vex_shell.ui.console import start_session
+        from vex_shell.cli.console import start_session
         await start_session(agent, console)
     except (KeyboardInterrupt, asyncio.CancelledError):
+        
         console.print(
             "\n[yellow]Session interrupted by user. Shutting down...[/yellow]"
         )

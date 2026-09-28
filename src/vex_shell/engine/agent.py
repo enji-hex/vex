@@ -18,7 +18,7 @@ from fnmatch import fnmatch
 from vex_shell.utils.file_access import file_access_control
 from vex_shell.mcp_tools.tools_mcp import MCPManager
 from vex_shell.utils.config import LOGGER,Settings
-from vex_shell.ui.events import *
+from vex_shell.engine.events import *
 from vex_shell.tools.tools import _glob_tool,_read_files
 from vex_shell.engine.helpers import get_model_context_length
 
@@ -30,7 +30,6 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
         method = event.get("method")
         params = event.get("params", {})
         data = params.get("data", {})
-        # LOGGER.debug(f"messages: {method} {data}")
 
         if method == "tools":
             LOGGER.debug(f"tools: {method} {data}")
