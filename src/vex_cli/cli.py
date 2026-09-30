@@ -1,18 +1,17 @@
+from __future__ import annotations
 import argparse
 import asyncio
-from importlib import resources
 from pathlib import Path
-import sys
+from typing import TYPE_CHECKING
 
-from rich.console import Console
-from vex_shell.cli import colors
-from vex_shell.utils.file_access import file_access_control
-from vex_shell.engine.agent import Agent
-import vex_shell.engine.core as core
-from vex_shell.engine import core
-
+if TYPE_CHECKING:
+    from vex_shell.engine.agent import Agent
+    from rich.console import Console
+    from vex_shell.utils.config import Settings
 
 def init_workspace(console: Console, home: bool = False) -> None:
+    from importlib import resources
+
     vex_dir = Path.home() / ".vex" if home else Path.cwd() / ".vex"
     vex_dir.mkdir(parents=True, exist_ok=True)
 
@@ -34,21 +33,33 @@ def init_workspace(console: Console, home: bool = False) -> None:
         "Set API keys and adjust settings for your requirements.[/vex.muted]"
     )
 
-async def list_sessions(agent:Agent, console: Console) -> None:
-    ids = await agent.get_sessions()
-    console.print(f"[vex.success][✓] Saved Session[/vex.success] DB_PATH: {agent.settings.db_path}")
+async def list_sessions(settings:Settings, console: Console) -> None:
+    from vex_shell.engine.helpers import get_saved_sessions
+    ids = await get_saved_sessions(settings.db_path)
+    console.print(f"[vex.success][✓] Saved Session[/vex.success] DB_PATH: {settings.db_path}")
     for id in ids:
         console.print(f"- {id}")
 
 async def run_agent(args):
     # no args , init systemwide config
     if not Path.exists(Path.home() / ".vex"):
+        from rich.console import Console
         console = Console()
         init_workspace(console=console, home=True)
         return
 
+    if args.reset:
+        (Path.cwd() / ".vex" / "session.db").unlink(missing_ok=True)
+        return
+    if args.reset_global:
+        (Path.home() / ".vex" / "session.db").unlink(missing_ok=True)
+        return
 
+    # loading config themes
+    from vex_cli import colors
     from vex_shell.utils import config
+    from vex_shell.utils.file_access import file_access_control
+
     settings = config.Settings()
     file_access_control.reconfigure(settings)
 
@@ -56,42 +67,42 @@ async def run_agent(args):
     sel_theme,themes = colors.load_theme(theme_name)
     if not sel_theme:
         raise Exception(f'Error theme {theme_name} doesnt exists in themes.csv')
-    
+
+    # start console for sane(pretty) output
+    from rich.console import Console
     console = Console(theme=sel_theme.to_rich_theme())
+    
     if args.init:
         init_workspace(console=console)
-        return
-    if args.reset:
-        (Path.cwd() / ".vex" / "session.db").unlink(missing_ok=True)
-        return
-    if args.reset_global:
-        (Path.home() / ".vex" / "session.db").unlink(missing_ok=True)
         return
     if args.list_themes:
         console.print(f"[vex.success][✓] Available themes[/vex.success]")
         for id in themes:
             console.print(f"- {id}")
         return
-
+    if args.list_sessions:
+        await list_sessions(settings,console)
+        return
     
+    # Start agent
+    from vex_shell.engine import core
+    from vex_shell.engine.agent import Agent
+
     tools,mcp_manager = await core.get_tools(settings)
     graph = core.build_graph(settings, tools)
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
     
     try:
-        if args.list_sessions:
-            await list_sessions(agent,console)
-            return
-
-        from vex_shell.cli.console import start_session
+        from vex_cli.console import start_session
         await start_session(agent, console)
     except (KeyboardInterrupt, asyncio.CancelledError):
-        
         console.print(
             "\n[yellow]Session interrupted by user. Shutting down...[/yellow]"
         )
     except Exception as e:
+        import traceback
         console.print(f"\n[red]Unexpected error: {e}[/red]")
+        traceback.print_exc()
     finally:
         await agent.close()
 

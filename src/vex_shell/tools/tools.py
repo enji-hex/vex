@@ -1,21 +1,23 @@
+from __future__ import annotations
+
 from pathlib import Path
-import os, sys
+import os
 import glob
-from langchain.tools import ToolRuntime, InjectedState, InjectedToolCallId
+from langchain.tools import InjectedState, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.tools import BaseTool, tool
-from langchain_core.messages import ToolMessage
-from typing import Annotated, Dict, List, Tuple
-from base64 import b64encode
+
 from langchain_core.runnables import RunnableConfig
-from PIL import Image
+from typing import Annotated, Dict, List, Tuple,TYPE_CHECKING
+
 import io
 import pathspec
 
 from vex_shell.utils.config import LOGGER
-from vex_shell.engine.state import FileData
 from vex_shell.utils.file_access import file_access_control
+from vex_shell.engine.state import FileData
 
+    
 # 
 # CORE tools packet
 # 
@@ -37,6 +39,9 @@ def get_rel_str(p: Path, cwd: Path) -> str:
         return p.as_posix()
 
 def read_image(path:Path,max_dim: int = 1024) -> str:
+    from base64 import b64encode
+    from PIL import Image
+
     with Image.open(path) as img:
         # fix for PNG
         if (
@@ -114,6 +119,8 @@ def read_files(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command | str:
     """Read multiple NEW files from disk and add it to the active working context."""
+
+    from langchain_core.messages import ToolMessage
     
     loaded, msgs = _read_files(paths,config,state)
     
@@ -141,6 +148,8 @@ async def write_file(
     Write provided content into the specified file path.
     Create parent folder if it doesn't exist
     """
+    from langchain_core.messages import ToolMessage
+
     cache_on_write = config.get('configurable',{}).get('cache_on_write',False)
 
     cwd = Path(file_access_control.cwd)

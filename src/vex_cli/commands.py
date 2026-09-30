@@ -106,9 +106,6 @@ async def cli_command(
             f"{'Cache on Write:':<{left_padding}}{cache_on_write}\n"
         )
 
-        # get Active context data
-        MAX_WINDOW = agent.settings.model["max_context_window"]
-
         state = await agent.get_state()
         loaded: Dict[str, FileData] = state.values.get("loaded_files", {})
         cwd_tree = state.values.get("cwd_tree", "")
@@ -136,8 +133,7 @@ async def cli_command(
             tok_str = f"~{tree_tokens:,}"
             content += f"< {'CwdTree':<{LABEL_W}} {tok_str:>{TOK_W}} tokens >\n"
 
-        pct_used = (total_tokens / MAX_WINDOW) * 100
-        content += f"\nTotal Context: ~{total_tokens:,} / {MAX_WINDOW:,} tokens ({pct_used:.1f}%)"
+        content += f"\nTotal Context: ~{total_tokens:,} tokens"
         show_transient_panel(content, "Usage Metrics", console)
         return CliOutput.RES_SKIP
 

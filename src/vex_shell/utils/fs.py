@@ -2,13 +2,13 @@ from pathlib import Path
 
 from .config import LOGGER
 from .file_access import file_access_control
-from vex_shell.tools.tools import _tree_tool
-from vex_shell.engine.state import FileData
 
+from vex_shell.engine.state import FileData
 from vex_shell.engine.state import State
 
 def sync_cwd_tree(state: State) -> str:
     """Update cwd_tree in Agent State"""
+    from vex_shell.tools.tools import _tree_tool
 
     new_tree = _tree_tool(file_access_control.cwd)
     state.update({"cwd_tree":new_tree})

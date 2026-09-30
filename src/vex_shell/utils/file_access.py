@@ -1,9 +1,12 @@
+from __future__ import annotations
 import asyncio
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Literal, Optional
-from .config import Settings
+from typing import List, Literal, Optional,TYPE_CHECKING
 import fnmatch
+
+if TYPE_CHECKING:
+    from .config import Settings
 
 
 

@@ -12,7 +12,8 @@
   ╚═══╝  ╚══════╝╚═╝  ╚═╝
 </pre>
 
-VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*) that keeps your workspace in sync while you interact with large language models. It combines LangChain, LangGraph, and OpenRouter(or ollama) to give you a fast, secure, and extensible development assistant.
+VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*) that keeps your workspace in sync while you interact with large 
+language models. It combines LangChain, LangGraph, and OpenRouter(or ollama) to give you a fast, secure, and extensible development assistant.
 
 ## Core Highlights
 - **State‑graph agent** - Powered by async SQLite checkpointing; sessions survive crashes and can be resumed anytime.
@@ -145,6 +146,20 @@ Full agent functionality out of the box!!
 | `/env` | Reveal the path of the loaded environment configuration file (`.env`). |
 | `/help` | Show the help screen with available slash commands. |
 | `/q` | Quit the current VEX session. |
+
+
+## Metrics
+
+- **Footprint**
+```
+---------------------
+VEX_SHELL 1403
+VEX_CLI   665
+TOTAL     2068
+---------------------
+```
+- **Start time:** ~2s
+- **utility functions (-ls/--help):** ~400ms
 
 ## Additional Documentation
 - [Agentic Awareness](./docs/agentic_awareness.md)

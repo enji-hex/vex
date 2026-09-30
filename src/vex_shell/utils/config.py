@@ -1,7 +1,6 @@
 from logging import Logger, FileHandler
 from pathlib import Path
 from typing import Any, Dict, List
-import yaml
 import logging
 import os
 import tomllib

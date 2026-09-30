@@ -1,29 +1,38 @@
-import asyncio
+from __future__ import annotations
+
 from pathlib import Path
 from typing import (
     AsyncIterator,
     List,
     Optional,
     Self,
+    TYPE_CHECKING
 )
 import warnings
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph.state import StateGraph,CompiledStateGraph
-from langchain_core.messages import AnyMessage, HumanMessage
-from langgraph.prebuilt import ToolCallTransformer
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import aiosqlite
 from fnmatch import fnmatch
-
 from vex_shell.utils.file_access import file_access_control
-from vex_shell.mcp_tools.tools_mcp import MCPManager
 from vex_shell.utils.config import LOGGER,Settings
 from vex_shell.engine.events import *
-from vex_shell.tools.tools import _glob_tool,_read_files
-from vex_shell.engine.helpers import get_model_context_length
 
-warnings.filterwarnings("ignore", message=".*v3 streaming protocol.*")
+from langchain_core._api.beta_decorator import LangChainBetaWarning
 
+warnings.simplefilter("ignore", category=LangChainBetaWarning)
+
+# import only for type checking
+if TYPE_CHECKING:
+    from langchain_core.messages import AnyMessage
+    from vex_shell.tools.tools import _glob_tool,_read_files
+    from langgraph.graph.state import StateGraph,CompiledStateGraph
+    from vex_shell.mcp_tools.tools_mcp import MCPManager
+
+def _glob_tool(*args,**kwargs):
+    from vex_shell.tools.tools import _glob_tool as real_fn
+    return real_fn(*args,**kwargs)
+
+def _read_files(*args,**kwargs):
+    from vex_shell.tools.tools import _read_files as real_fn
+    return real_fn(*args,**kwargs)
 
 async def process(stream) -> AsyncIterator[AgentEvent]:
     async for event in stream:
@@ -92,14 +101,14 @@ class Agent:
         session_id: str,
         settings: Settings,
         conn: aiosqlite.Connection,
-        max_context_window:int,
         mcp_manager: Optional[MCPManager] = None,
     ) -> None:
+        from langchain_core.runnables import RunnableConfig
+
         self.graph = compiled_graph
         self.settings = settings
         self.mcp_manager = mcp_manager
         self.conn = conn
-        self.settings.model['max_context_window'] = max_context_window
         self.config: RunnableConfig = {
             "configurable": {
                 "thread_id": session_id,
@@ -117,35 +126,21 @@ class Agent:
         settings:Settings,
         mcp_manager:Optional[MCPManager] = None
     ) -> Self:
+        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
         conn = await aiosqlite.connect(settings.db_path)
         checkpointer = AsyncSqliteSaver(conn)
         await checkpointer.setup()
         compiled_graph = graph.compile(checkpointer=checkpointer)
 
-        _context_window = None
-        if settings.model['provider'] == 'openrouter':
-            _context_window = get_model_context_length(settings.model['name'])
-        
-        # gather only for open router models
-        max_context_window = _context_window if _context_window else 128_000 
-
-
-        agent =  cls(compiled_graph,session_id,settings,conn,max_context_window,mcp_manager)
+        agent =  cls(compiled_graph,session_id,settings,conn,mcp_manager)
         await agent.restore_token_usage()
         return agent
 
     
     async def get_state(self):
         return await self.graph.aget_state(self.config)
-    
-    async def get_sessions(self) -> List[str]:
-        cusrsor = await self.conn.execute(
-            "SELECT DISTINCT thread_id FROM checkpoints ORDER BY thread_id"
-        )
-        rows = await cusrsor.fetchall()
-        ids = [r[0] for r in rows if r[0] is not None]
-        return ids
-    
+
     async def read_files(self,pattern:str) -> List[str]:
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
@@ -249,6 +244,9 @@ class Agent:
 
 
     async def run_step(self,user_input:str) -> AsyncIterator[AgentEvent]:
+        from langgraph.prebuilt import ToolCallTransformer
+        from langchain_core.messages import HumanMessage,SystemMessage
+
         stream = await self.graph.astream_events(
             {"messages": [HumanMessage(content=user_input)]},
             config=self.config,

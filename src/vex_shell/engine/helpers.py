@@ -1,51 +1,28 @@
-
 from __future__ import annotations
 
-import asyncio
-from pathlib import Path
-import aiosqlite
-
-from typing import Annotated, Any, Dict, List, Optional, Tuple, TypedDict
-from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import BaseTool
-from langchain.messages import ToolMessage
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from langgraph.graph import START, END
-from langgraph.graph.message import add_messages
-
-from functools import partial
-from langchain_openrouter import ChatOpenRouter
-from langchain_openai import ChatOpenAI
-from langchain.messages import (
-    HumanMessage,
-    AnyMessage,
-    AIMessage,
-    SystemMessage,
-    ToolMessage,
-    ToolCall
-)
-from vex_shell.tools.tools import tools
 import json
+from pathlib import Path
 import uuid
-
+from typing import Any, Dict, List,TYPE_CHECKING
 from vex_shell.utils.config import LOGGER
-from .state import State
-import requests
 
-def get_model_context_length(model_id: str) -> Optional[int]:
-    """Gather max_token_context for specified LLM"""
-    try:
-        res = requests.get("https://openrouter.ai/api/v1/models")
-        if res.status_code == 200:
-            data = res.json().get("data", [])
-            for m in data:
-                if m.get("id") == model_id:
-                    return m.get("context_length")
-    except Exception:
-        return None
-    
+if TYPE_CHECKING:
+    from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
+    from .state import State
+
+async def get_saved_sessions(db_path:str|Path) -> list[str]:
+    import aiosqlite
+    path = Path(db_path)
+    if not path.exists(): return []
+
+    async with aiosqlite.connect(path) as db:
+        async with db.execute("SELECT DISTINCT thread_id FROM checkpoints") as cursor:
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
 
 def get_safe_window(messages:list, target_window:int) -> list:
+    from langchain_core.messages import HumanMessage, ToolMessage
+
     if target_window != -1 and len(messages) > target_window:
         sliced = messages[-target_window:]
         for i,msg in enumerate(sliced):
@@ -120,6 +97,8 @@ def format_file_context(
 
 
 def normalize_tool_calls(msg:AIMessage,tool_names:List[str]) -> AIMessage:
+    from langchain_core.messages import ToolCall
+
     if msg.tool_calls: return msg
     
     text = " ".join(b.get("text", "") for b in msg.content) if isinstance(msg.content, list) else ""

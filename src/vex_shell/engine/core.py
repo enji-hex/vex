@@ -1,22 +1,21 @@
 from __future__ import annotations
-
-from typing import Annotated, Any, Dict, List, Optional, Tuple, TypedDict
-from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import BaseTool
-
-from langgraph.graph import START, END
-
-from langgraph.graph.state import CompiledStateGraph, StateGraph
 from functools import partial
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
-from langgraph.prebuilt import ToolNode
-from vex_shell.utils.config import Settings
 
-from vex_shell.mcp_tools.tools_mcp import MCPManager
-from .nodes import llm_call_node, verification_node, should_continue, should_verify
-from .state import State
-from .agent import Agent
+# from langgraph.graph import START, END 
+# thi shit imports ENTIRE langgraph.graph module!!!
+END = "__end__"
+START = "__start__"
 
+# import only for type checking
+if TYPE_CHECKING:
+    from langchain_core.tools import BaseTool
+    from vex_shell.mcp_tools.tools_mcp import MCPManager
+    from langgraph.graph.state import  StateGraph
+    from vex_shell.utils.config import Settings
+    from .state import State
+    
 
 async def get_tools(settings:Settings) -> Tuple[List[BaseTool], Optional[MCPManager]]:
     from ..tools.tools import tools # singletone
@@ -31,6 +30,12 @@ async def get_tools(settings:Settings) -> Tuple[List[BaseTool], Optional[MCPMana
     return tools,mcp_manager
 
 def build_graph(settings: Settings, tools:List[BaseTool]) -> StateGraph:
+    from langgraph.graph.state import  StateGraph
+    from langgraph.prebuilt import ToolNode
+
+    from .nodes import llm_call_node, verification_node, should_continue, should_verify
+    from .state import State
+
     tool_names = [e.name for e in tools]
     
     graph = StateGraph(State)

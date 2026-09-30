@@ -1,42 +1,17 @@
 from __future__ import annotations
+from typing import List, TYPE_CHECKING
 
-import asyncio
-import os
+import asyncio,os
 
-from typing import Annotated, Any, Dict, List, Optional, Tuple, TypedDict
-from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import BaseTool
-from langchain.messages import ToolMessage
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from langgraph.graph import START, END
-from langgraph.graph.message import add_messages
+if TYPE_CHECKING:
+    from langchain_core.runnables import RunnableConfig
+    from vex_shell.utils.config import Settings
 
-from langgraph.graph.state import CompiledStateGraph, StateGraph
-from functools import partial
-from langchain_openrouter import ChatOpenRouter
-from langchain_openai import ChatOpenAI
-from langchain.messages import (
-    HumanMessage,
-    AnyMessage,
-    AIMessage,
-    SystemMessage,
-    ToolMessage,
-    ToolCall,
-)
-from langgraph.prebuilt import ToolNode
-from vex_shell.tools.tools import tools
-
-from vex_shell.utils.config import Settings, LOGGER
+from vex_shell.utils.config import LOGGER
 from vex_shell.utils.file_access import file_access_control
+from vex_shell.utils.fs import sync_loaded_files,sync_cwd_tree
 
 from .state import State
-from vex_shell.utils.fs import sync_loaded_files,sync_cwd_tree
-from .helpers import (
-    get_safe_window,
-    format_file_context,
-    normalize_tool_calls,
-)
-
 
 # LLM NODES
 async def llm_call_node(
@@ -48,6 +23,16 @@ async def llm_call_node(
     - Bad model
     - No tool support
     """
+    from langchain_openai import ChatOpenAI
+    from langchain_openrouter import ChatOpenRouter
+    from vex_shell.tools.tools import tools
+    from langchain.messages import SystemMessage,HumanMessage
+    from .helpers import (
+        get_safe_window,
+        format_file_context,
+        normalize_tool_calls,
+    )
+
 
     llm_cfg = settings.model
     current_calls = state.get("llm_calls", 0) + 1
@@ -146,6 +131,8 @@ async def llm_call_node(
 
 
 def should_verify(state: State):
+    from langchain_core.messages import ToolMessage
+
     last_msg = state["messages"][-1]
 
     if isinstance(last_msg, ToolMessage) and last_msg.name == "write_file":
@@ -155,7 +142,7 @@ def should_verify(state: State):
 
 
 async def verification_node(state: State, settings: Settings):
-
+    from langchain_core.messages import HumanMessage
     check_cmd = settings.verification.get("check_command")
 
     if check_cmd:
@@ -183,7 +170,11 @@ async def verification_node(state: State, settings: Settings):
 
     return {}
 
+
 def should_continue(state: State):
+    END = "__end__"
+    from langchain_core.messages import AIMessage
+
     messages = state.get("messages",[])
     if not messages:
         return END

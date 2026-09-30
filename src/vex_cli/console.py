@@ -21,8 +21,8 @@ from langchain_core.messages import (
 
 from vex_shell.utils.config import LOGGER
 from vex_shell.utils.fs import sync_cwd_tree
-from vex_shell.cli import prompt
-from vex_shell.cli.commands import cli_command, CliOutput
+from vex_cli import prompt
+from vex_cli.commands import cli_command, CliOutput
 from vex_shell.engine.events import *
 from vex_shell.engine.agent import Agent
 
