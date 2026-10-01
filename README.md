@@ -153,16 +153,21 @@ Full agent functionality out of the box!!
 - **Footprint**
 ```
 ---------------------
-VEX_SHELL 1403
-VEX_CLI   665
-TOTAL     2068
+Module    LOC
+VEX_SHELL 1092
+VEX_CLI   541
+TOTAL     1633
 ---------------------
 ```
 - **Start time:** ~2s
 - **utility functions (-ls/--help):** ~400ms
 
 ## Additional Documentation
-- [Agentic Awareness](./docs/agentic_awareness.md)
+- [Agentic Awareness](./docs/vex_agentic_awareness.md)
+- [Architecture Deep Dive: Startup Time & Import Optimization](./docs/vex_startup_time_optimization.md)
+
+## TODO
+- on-demand `write_file` appending, remove if write access denied.
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.

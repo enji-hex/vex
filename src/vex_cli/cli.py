@@ -102,7 +102,7 @@ async def run_agent(args):
     except Exception as e:
         import traceback
         console.print(f"\n[red]Unexpected error: {e}[/red]")
-        traceback.print_exc()
+        # traceback.print_exc()
     finally:
         await agent.close()
 
