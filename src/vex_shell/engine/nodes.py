@@ -6,6 +6,7 @@ import asyncio,os
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
     from vex_shell.utils.config import Settings
+    from langchain.tools import BaseTool
 
 from vex_shell.utils.config import LOGGER
 from vex_shell.utils.file_access import file_access_control
@@ -15,7 +16,7 @@ from .state import State
 
 # LLM NODES
 async def llm_call_node(
-    state: State, config: RunnableConfig, settings: Settings, tool_names: List[str]
+    state: State, config: RunnableConfig, settings: Settings, tools:List[BaseTool]
 ):
     """
     Handle errors
@@ -25,7 +26,6 @@ async def llm_call_node(
     """
     from langchain_openai import ChatOpenAI
     from langchain_openrouter import ChatOpenRouter
-    from vex_shell.tools.tools import tools
     from langchain.messages import SystemMessage,HumanMessage
     from .helpers import (
         get_safe_window,
@@ -33,6 +33,7 @@ async def llm_call_node(
         normalize_tool_calls,
     )
 
+    tool_names = [e.name for e in tools]
 
     llm_cfg = settings.model
     current_calls = state.get("llm_calls", 0) + 1

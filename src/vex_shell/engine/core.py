@@ -36,14 +36,12 @@ def build_graph(settings: Settings, tools:List[BaseTool]) -> StateGraph:
 
     from .nodes import llm_call_node, verification_node, should_continue, should_verify
     from .state import State
-
-    tool_names = [e.name for e in tools]
     
     graph = StateGraph(State)
     
     # LLM Nodes
     graph.add_node(
-        "llm_call", partial(llm_call_node, settings=settings, tool_names=tool_names)
+        "llm_call", partial(llm_call_node, settings=settings,tools=tools)
     )
     graph.add_node("tool_node", ToolNode(tools))
     graph.add_node("verification_node", partial(verification_node, settings=settings))

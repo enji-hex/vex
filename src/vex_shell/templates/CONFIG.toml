@@ -8,7 +8,7 @@ use_mcp =  false
 load_last_n =  10
 
 # keep/hide tool-info boxes
-keep_tool_logs =  true
+keep_tool_logs =  false
 # optional, ignored if empty
 custom_cwd = ""
 autosync_cwd_tree = false
