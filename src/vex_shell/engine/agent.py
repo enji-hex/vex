@@ -232,12 +232,12 @@ class Agent:
 
                 if isinstance(m.content,str):
                     recent_messages.append(m)
-                    LOGGER.info('restore history, msg str')
+                    LOGGER.debug('restore history, msg str')
                 elif isinstance(m.content, list) and \
                     any(isinstance(c, dict) \
                         and c.get("type") == "text" for c in m.content
                     ):
-                    LOGGER.info('restore history, msg list')
+                    LOGGER.debug('restore history, msg list')
                     recent_messages.append(m)
 
         return recent_messages

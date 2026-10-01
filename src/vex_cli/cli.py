@@ -1,5 +1,6 @@
 from __future__ import annotations
 import argparse
+import os,time
 import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -88,9 +89,27 @@ async def run_agent(args):
     from vex_shell.engine import core
     from vex_shell.engine.agent import Agent
 
+    # timings check
+    # ---------------------
+    t0 = time.perf_counter_ns()
+
     tools,mcp_manager = await core.get_tools(settings)
+    t_tools = time.perf_counter_ns()
+
     graph = core.build_graph(settings, tools)
+    t_graph = time.perf_counter_ns()
+
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
+    t_agent = time.perf_counter_ns()
+
+    config.LOGGER.debug(
+        "Startup breakdown:\n"
+        f"- Tools & MCP:  {(t_tools - t0) / 1e6:.1f}ms\n"
+        f"- Graph Build:  {(t_graph - t_tools) / 1e6:.1f}ms\n"
+        f"- Agent Init:   {(t_agent - t_graph) / 1e6:.1f}ms\n"
+        f"- Total Core:   {(t_agent - t0) / 1e6:.1f}ms"
+    )
+    # ---------------------
     
     try:
         from vex_cli.console import start_session
@@ -107,6 +126,9 @@ async def run_agent(args):
         await agent.close()
 
 def cli() -> None:
+    # startup marker
+    os.environ["VEX_START_NS"] = str(time.perf_counter_ns())
+
     parser = argparse.ArgumentParser(
         description=(
             "VEX Shell – initialise a workspace or start an agent session. "

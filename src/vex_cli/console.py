@@ -1,6 +1,7 @@
 from typing import (
     List,
 )
+import os
 from rich.box import SQUARE
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -9,7 +10,8 @@ from rich.markdown import Markdown
 from rich.spinner import Spinner
 from rich.live import Live
 from rich.text import Text
-import sys, io
+import sys, io,time
+
 
 from langchain_core.messages import (
     HumanMessage,
@@ -167,8 +169,13 @@ async def start_session(
     prompt_session = prompt.Prompt(console, commands)
 
     user_input_default = ""
+    
+    start_ns = os.environ.get("VEX_START_NS")
+    if start_ns:
+        elapsed_ms = (time.perf_counter_ns() - int(start_ns)) / 1_000_000
+        LOGGER.debug(f'console started, elapsed time {elapsed_ms:.2f}ms')
+
     while True:
-        
         user_input = await prompt_session.ask(
             "\n[vex.prompt]SHELL > [/vex.prompt]",
             # pass recorded string in user input if exists

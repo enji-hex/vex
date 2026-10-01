@@ -33,7 +33,7 @@ async def run_agent(args):
     graph = core.build_graph(settings, tools)
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
 ```
-*[cli.py](../src/vex_cli/cli.py#43)*
+*[cli.py](https://codeberg.org/Enji/vex/src/branch/main/src/vex_cli/cli.py#L43)*
 
 All heavy imports occur after utility args checking(`from vex_shell.engine import core` etc).
 
@@ -93,7 +93,7 @@ def build_graph(settings: Settings, tools:List[BaseTool]) -> StateGraph:
 
 ### Fun to note
 
-In [nodes.py](../src/vex_shell/engine/nodes.py) I used `from langgraph.graph.state import END`
+In [nodes.py](https://codeberg.org/Enji/vex/src/branch/main/src/vex_shell/engine/nodes.py) I used `from langgraph.graph.state import END`
 only for `END` constant, but it leads to a whole module import which consumes `1.36s`. By  just replacing this import with `END = "__end__"` I saved this time.
 
 

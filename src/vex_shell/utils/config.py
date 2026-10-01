@@ -8,10 +8,11 @@ import dotenv
 
 LOGGER = Logger("VEX-SHELL-DEBUG")
 
-
-def reconfigure_logger(path,level):
+def reconfigure_logger(path:str,log_level:str):
     global LOGGER
-    LOGGER.setLevel(level)
+    LOGGER.setLevel(
+        logging.getLevelNamesMapping().get(log_level.upper(),logging.INFO)
+    )
     LOGGER.addHandler(FileHandler(path, "w", "utf-8"))
 
 class Settings:
@@ -55,7 +56,7 @@ class Settings:
         self.config_path = p.as_posix()
         self.db_path = (Path(p) / "session.db").as_posix()
 
-        reconfigure_logger(f"{self.config_path}/vex.log",logging.DEBUG)
+        reconfigure_logger(f"{self.config_path}/vex.log",cfg.get('logging_level',''))
 
         self.system_prompt = self._get_system_prompt()
         LOGGER.info(f'system prompt loaded from {self.config_path}')

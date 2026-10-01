@@ -8,7 +8,7 @@ from langgraph.types import Command
 from langchain_core.tools import BaseTool, tool
 
 from langchain_core.runnables import RunnableConfig
-from typing import Annotated, Dict, List, Tuple,TYPE_CHECKING
+from typing import Annotated, Dict, List, Tuple
 
 import io
 import pathspec
@@ -281,7 +281,15 @@ def tree_tool(root: str = ".") -> str:
     """Return an indented tree view of *root* showing permission-validated files."""
     return _tree_tool(root)
 
+def get_tools():
+    tools = []
+    has_write_access = len(file_access_control.write_patterns) > 0
     
-tools = [ obj for _, obj in globals().items() if isinstance(obj, BaseTool) ]
-LOGGER.info(f"Loaded {len(tools)} tools: {str([t.name for t in tools])}")
+    for _,obj in globals().items():
+        if isinstance(obj,BaseTool):
+            if obj.name == "write_file" and has_write_access == False:
+                continue
+            tools.append(obj)
 
+    LOGGER.info(f"Loaded {len(tools)} tools: {str([t.name for t in tools])}")
+    return tools

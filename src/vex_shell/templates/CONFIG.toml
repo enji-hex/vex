@@ -1,3 +1,5 @@
+logging_level = "info" # info if not present, use standard python logging levels
+
 [chat]
 # control imported MCP tools only, core tools available always
 use_mcp =  false
@@ -6,12 +8,12 @@ use_mcp =  false
 load_last_n =  10
 
 # keep/hide tool-info boxes
-keep_tool_logs =  false
+keep_tool_logs =  true
 # optional, ignored if empty
 custom_cwd = ""
 autosync_cwd_tree = false
 # Auto read each file written by LLM
-cache_on_write    = true
+cache_on_write    = false
 theme = "Land-of-Ooo"
 
 [verification]
@@ -26,20 +28,20 @@ observe_command = ""
 
 # you can set even not existing directories, agent will create it automatically
 read_patterns = ['**/*']
-write_patterns = ['./docs/**']
+write_patterns = []
 
 [model]
 # ollama / openrouter
 provider = "openrouter"
 # optional 
-# llm_url = "http://localhost:11434/v1" 
+# llm_url = "http://localhost:11434/v1"
 
 
 use_vision = false # image read support
 # name = "openai/gpt-oss-120b"
 
 name = "dots-studio/dots-3-note-preview:free"
-# name = "google/gemma-4-26b-a4b-it"
+# name = "HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive:Q6_K_P"
 
 # set to -1 set infinity length
 context_sliding_window = 10
@@ -54,14 +56,14 @@ stream_chunk_timeout=0
 
 # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
 [model.reasoning]
-# max_tokens = 2000
-effort = "low"
+max_tokens = 20000
+# effort = "medium"
 
 
 # openrouter 
 # ----------------------
-# [model.extra_body]
-# repetition_penalty = 2
+[model.extra_body]
+repetition_penalty = 1.2
 
 # [model.extra_body.provider]
 # data_collection = "deny"

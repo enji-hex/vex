@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 
 # from langgraph.graph import START, END 
 # thi shit imports ENTIRE langgraph.graph module!!!
-END = "__end__"
+END   = "__end__"
 START = "__start__"
 
 # import only for type checking
@@ -18,7 +18,8 @@ if TYPE_CHECKING:
     
 
 async def get_tools(settings:Settings) -> Tuple[List[BaseTool], Optional[MCPManager]]:
-    from ..tools.tools import tools # singletone
+    from ..tools.tools import get_tools
+    tools = get_tools()
     if settings.chat["use_mcp"]:
         from vex_shell.mcp_tools.tools_mcp import load_mcp_tools
 
