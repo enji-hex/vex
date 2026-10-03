@@ -22,6 +22,7 @@ class Settings:
             Path.home() / ".vex",
         ]
         cfg = None
+        self.vex_folder = "" # always initialized
 
         # separate loading env
         # search ENV in CWD/.vex -> HOME/.vex
@@ -39,6 +40,7 @@ class Settings:
             if cfg_file.is_file():
                 cfg =  tomllib.loads(cfg_file.read_text(encoding='utf-8'))
                 provider = cfg.get("model",{}).get("VEX_API_KEY")
+                self.vex_folder = p
                 if os.getenv("VEX_API_KEY") or provider == "ollama":
                     break
 
@@ -52,7 +54,7 @@ class Settings:
         
         self.model: Dict[str, Any] = cfg["model"]
         self.chat: Dict[str, Any] = cfg["chat"]
-        self.permissions: Dict[str, List[str]] = cfg["permissions"]
+        self.permissions: Dict[str, List[str]] = cfg["model"]["permissions"]
         self.config_path = p.as_posix()
         self.db_path = (Path(p) / "session.db").as_posix()
 

@@ -114,14 +114,6 @@ async def run_agent(args):
     try:
         from vex_cli.console import start_session
         await start_session(agent, console)
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        console.print(
-            "\n[yellow]Session interrupted by user. Shutting down...[/yellow]"
-        )
-    except Exception as e:
-        import traceback
-        console.print(f"\n[red]Unexpected error: {e}[/red]")
-        # traceback.print_exc()
     finally:
         await agent.close()
 
@@ -154,8 +146,15 @@ def cli() -> None:
         help="reset global sqlite database (in user home)",
     )
     args = parser.parse_args()
-    asyncio.run(run_agent(args))
-
+    try:
+        asyncio.run(run_agent(args))
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        from rich.console import Console
+        Console().print("\n[yellow]Session interrupted by user. Shutting down...[/yellow]")
+    except Exception as e:
+        from rich.console import Console
+        Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
+    
 
 if __name__ == "__main__":
     cli()

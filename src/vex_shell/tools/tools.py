@@ -38,6 +38,7 @@ def get_rel_str(p: Path, cwd: Path) -> str:
     except ValueError:
         return p.as_posix()
 
+
 def read_image(path:Path,max_dim: int = 1024) -> str:
     from base64 import b64encode
     from PIL import Image
@@ -235,45 +236,51 @@ def _tree_tool(root: str = ".") -> str:
         return f"tree_tool: {root} is not dir"
 
     spec = get_gitignore_spec(cwd)
-    lines = [f"{base.name}/"]
+    valid_rel_paths: List[Path] = []
 
     for dirpath_str, dirnames, filenames in os.walk(base):
         dirpath = Path(dirpath_str)
-
-        # 1. Filter directories using .gitignore only
+        
+        # Filter fiels with .gitignore
         dirnames[:] = sorted(
             d
             for d in dirnames
             if not spec.match_file(get_rel_str(dirpath / d, cwd) + "/")
         )
 
-        rel_path = dirpath.relative_to(base)
-        depth = len(rel_path.parts)
-
-        # 2. Filter and validate files
-        valid_files = []
         for f in sorted(filenames):
             file_path = dirpath / f
-            if spec.match_file(get_rel_str(file_path, cwd)):
+            rel_str = get_rel_str(file_path, cwd)
+
+            if spec.match_file(rel_str):
                 continue
             try:
                 file_access_control.validate_read(str(file_path))
-                valid_files.append(f)
+                valid_rel_paths.append(file_path.relative_to(base))
             except PermissionError:
                 pass
 
-        # 3. Append directory header only if it contains validated files
-        if valid_files:
-            if depth > 0:
-                indent = "  " * depth
-                lines.append(f"{indent}{dirpath.name}/")
+    if not valid_rel_paths:
+        return f"{base.name}/ (no accessible files)"
 
-            file_indent = "  " * (depth + 1 if depth > 0 else 1)
-            for f in valid_files:
-                lines.append(f"{file_indent}{f}")
+    printed_dirs: set[Path] = set()
+    lines = [f"{base.name}/"]
 
-    res = "\n".join(lines)
-    return res
+    for rel_file in sorted(valid_rel_paths):
+        ancestors = [p for p in reversed(rel_file.parents) if p != Path(".")]
+
+        for parent in ancestors:
+            if parent not in printed_dirs:
+                depth = len(parent.parts)
+                indent = "  " * depth  # 2 spaces per level
+                lines.append(f"{indent}{parent.name}/")
+                printed_dirs.add(parent)
+
+        depth = len(rel_file.parts)
+        indent = "  " * depth
+        lines.append(f"{indent}{rel_file.name}")
+
+    return "\n".join(lines)
 
 
 @tool
@@ -283,7 +290,7 @@ def tree_tool(root: str = ".") -> str:
 
 def get_tools():
     tools = []
-    has_write_access = len(file_access_control.write_patterns) > 0
+    has_write_access = len(file_access_control.write_patterns) > 0 or file_access_control.all_write
     
     for _,obj in globals().items():
         if isinstance(obj,BaseTool):

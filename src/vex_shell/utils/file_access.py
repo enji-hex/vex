@@ -4,11 +4,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import List, Literal, Optional,TYPE_CHECKING
 import fnmatch
+import logging
+from vex_shell.utils.config import LOGGER
 
 if TYPE_CHECKING:
     from .config import Settings
-
-
 
 
 class FileAccessControl:
@@ -36,34 +36,70 @@ class FileAccessControl:
 
         self.base_dir = base_dir
         self.cwd      = base_dir.as_posix()
-        if settings is None:
-            read_patterns  = ["**/*"]
-            write_patterns = []
-        else:
-            read_patterns  = settings.permissions.get('read_patterns', [])
-            write_patterns = settings.permissions.get('write_patterns', [])
+        
+        read_patterns  = []
+        write_patterns = []
+        patterns = []
+        self.all_read  = False
+        self.all_write = False
 
-        self.all_read  = True if len(read_patterns)==1  and read_patterns[0] == '*' else False
-        self.all_write = True if len(write_patterns)==1 and write_patterns[0] == '*' else False
+        if settings is not None:
+            # reconfigure path
+            patterns = settings.permissions.get('patterns',[])
 
+        # parse patterns
+        for obj in patterns:
+            perm,pat = obj.split()
+            if 'r' in perm and self.all_read is False: 
+                if pat == '*': 
+                    self.all_read = True
+                else:
+                    read_patterns.append(pat)
+
+            if 'w' in perm and self.all_write is False: 
+                if pat == '*': 
+                    self.all_write = True
+                else:
+                    write_patterns.append(pat)
+
+        # Check patterns
         self.read_patterns  = self._strip_rel(read_patterns)
         self.write_patterns = self._strip_rel(write_patterns)
+
+        if LOGGER.level == logging.DEBUG:
+            env_block = self.build_environment_context()
+            LOGGER.debug(env_block)
                 
-    def _strip_rel(self,lst:list[str]):
+    def _strip_rel(self, lst: list[str]) -> list[str]:
         res = []
         for l in lst:
-            res.append(l[2:] if l.startswith('./') else l)
+            cleaned = l[2:] if l.startswith('./') or l.startswith('.\\') else l
+
+            if cleaned in ("", ".", "/", "\\"):
+                raise ValueError(
+                f'Invalid scope pattern "{l}": Bare "." or "./" matches only the directory node, '
+                'not its files. Did you mean "./*" (immediate files) or "./**" (recursive)?'
+                )
+            elif cleaned.endswith('/') or cleaned.endswith('\\'):
+                cleaned = cleaned.rstrip('/\\') + '/*'
+
+            res.append(cleaned)
         return res
 
     def _is_glob_match(self, target:Path, pattern:str) -> bool:
         try:
             rel_path = target.relative_to(self.base_dir)
-            rel_str = rel_path.as_posix()
+            rel_str  = rel_path.as_posix()
 
-            if pattern in ("**/*","**","."):
+            if pattern in ("**/*","**"):
                 return True
 
-            return rel_path.match(pattern) or fnmatch.fnmatch(rel_str,pattern)
+            # folder recursive wildcard
+            if pattern.endswith("/**"):
+                prefix = pattern[:-3]
+                return rel_path == prefix or rel_str.startswith(f"{prefix}/")
+            
+            return rel_path.match(pattern)
         except ValueError:
             is_abs_pattern = pattern.startswith("/") or (
                 len(pattern) > 1 and pattern[1] == ":"

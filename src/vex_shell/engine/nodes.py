@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from typing import List, TYPE_CHECKING
 
 import asyncio,os
@@ -35,15 +36,18 @@ async def llm_call_node(
 
     tool_names = [e.name for e in tools]
 
-    llm_cfg = settings.model
+    llm_cfg       = settings.model
     current_calls = state.get("llm_calls", 0) + 1
 
     # sync all loaded files
     new_files_snap = sync_loaded_files(state.get("loaded_files", {}))
+    # !! Move to model scope
     cwd_tree       = sync_cwd_tree(state) if settings.chat.get('autosync_cwd_tree',False) else None
+    if LOGGER.level == logging.DEBUG:
+        LOGGER.debug(f'CWD tree: {cwd_tree}')
 
     # handle sliding window
-    window: int = llm_cfg.get("context_sliding_window", -1)
+    window: int = llm_cfg.get("context_sliding_window", 10)
     recent = get_safe_window(state["messages"], window)
     
     system_msg = SystemMessage(content=settings.system_prompt)
@@ -76,7 +80,7 @@ async def llm_call_node(
             max_retries=int(llm_cfg["max_retries"]),
             stream_usage=True,
             streaming=True,
-            reasoning=llm_cfg["reasoning"],
+            reasoning=llm_cfg.get("reasoning",{"effort":"none"}),
             model_kwargs=llm_cfg.get("extra_body", {}),
         )
     elif llm_cfg["provider"] == "ollama":

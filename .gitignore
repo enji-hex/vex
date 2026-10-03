@@ -13,5 +13,4 @@ wheels/
 .env
 .vex
 *.db
-sandbox/
 */reports/

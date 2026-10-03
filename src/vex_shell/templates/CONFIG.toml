@@ -1,7 +1,8 @@
-logging_level = "info" # info if not present, use standard python logging levels
+logging_level = "info"
 
 [chat]
-# control imported MCP tools only, core tools available always
+# control imported MCP tools only, core tools available always, 
+# Important MCP tools NOT restricted by R/W permission management
 use_mcp =  false
 
 # count of messages loaded in console (not sliding window)
@@ -9,26 +10,15 @@ load_last_n =  10
 
 # keep/hide tool-info boxes
 keep_tool_logs =  false
-# optional, ignored if empty
-custom_cwd = ""
-autosync_cwd_tree = false
-# Auto read each file written by LLM
-cache_on_write    = false
+
+custom_cwd = ""             # optional
+autosync_cwd_tree = true
+cache_on_write    = false   # Auto read each file written by LLM
 theme = "Land-of-Ooo"
 
 [verification]
 check_command = ""
 observe_command = ""
-
-[permissions]
-# for both read and write prefixes follow rules applies
-# set patterns to ['*'] to allow full access 
-# set patterns to [] to deny access
-# use standard glob patterns 
-
-# you can set even not existing directories, agent will create it automatically
-read_patterns = ['**/*']
-write_patterns = []
 
 [model]
 # ollama / openrouter
@@ -36,33 +26,40 @@ provider = "openrouter"
 # optional 
 # llm_url = "http://localhost:11434/v1"
 
-
-use_vision = false # image read support
-# name = "openai/gpt-oss-120b"
-
+use_vision = false # optional,image read support
 name = "dots-studio/dots-3-note-preview:free"
-# name = "HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive:Q6_K_P"
 
 # set to -1 set infinity length
-context_sliding_window = 10
+context_sliding_window = 10 # default 10
 temperature = 0
 max_completion_tokens = 8000
 timeout =  60
 max_retries = 3
+
+[model.permissions]
+# r - read, w - write access
+# USE
+# ./* for current directory file access
+# ./** current directory + all subdirectories
+# * , e.g. "r *" full read access
+# empty patterns, no access at all
+
+patterns = [
+    "r ./**"
+]
+
 
 [model.ollama]
 # ollama provider timeout, set to 0 for disabling
 stream_chunk_timeout=0
 
 # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
-[model.reasoning]
-max_tokens = 20000
+[model.reasoning] # optional
+# max_tokens = 20000
 # effort = "medium"
 
 
-# openrouter 
-# ----------------------
-[model.extra_body]
+[model.extra_body] # optional
 repetition_penalty = 1.2
 
 # [model.extra_body.provider]
