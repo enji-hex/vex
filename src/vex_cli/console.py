@@ -23,10 +23,10 @@ from langchain_core.messages import (
 
 from vex_shell.utils.config import LOGGER
 from vex_shell.utils.fs import sync_cwd_tree
-from vex_cli.cli import prompt
 from vex_cli.commands import cli_command, CliOutput,CliResult
 from vex_shell.engine.events import *
 from vex_shell.engine.agent import Agent
+from vex_cli import prompt
 
 if isinstance(sys.stdout, io.TextIOWrapper):
     sys.stdout.reconfigure(encoding="utf-8")

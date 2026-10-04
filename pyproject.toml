@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vex_shell"
-version = "0.3.2"
+version = "0.3.2.1"
 description = "Lean AI agent that works as U expect"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -23,20 +23,18 @@ dependencies = [
     "msgspec>=0.21.1",
     "pathspec>=1.1.1",
     "pillow>=12.3.0",
-    "prompt-toolkit>=3.0.53",
     "pydantic-settings>=2.14.2",
     "rich>=15.0.0",
     "selectolax>=0.4.11",
-]
-
-# CLI module
-[project.optional-dependencies]
-cli = [
     "prompt-toolkit>=3.0.52",
     "rich>=15.0.0",
     "aiohttp>=3.14.3",
     "aiohttp-cors>=0.8.1",
 ]
+
+# CLI module
+[project.optional-dependencies]
+cli = []
 
 [project.scripts]
 vex = "vex_cli.cli:cli"

@@ -9,7 +9,6 @@ Code highlights: prism.js
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="./cb-css.min.css">
   <link rel="stylesheet" href="./styles.css">
 
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -164,28 +163,35 @@ Code highlights: prism.js
       }
     }
 
-    function changeStatus(session) {
-      if (session !== null) {
+    function changeStatus() {
+      if (SESSION_ID !== null) {
         document.getElementById('chat_section').style.display = "flex"
         document.getElementById('ls_section').style.display   = "none"
-        document.getElementById('status').textContent         = session
-        SESSION_ID = session
+        document.getElementById('status').textContent         = SESSION_ID
+
+        
       } else {
         document.getElementById('chat_section').style.display = "none"
         document.getElementById('ls_section').style.display   = "flex"
         document.getElementById('status').textContent         = "LIST SESSIONS"
       }
+
+      if (window.parent) {
+        window.parent.postMessage({ type: 'setSession', sessionId: SESSION_ID }, '*');
+      }
     }
 
     function onload() {
       const params = new URLSearchParams(window.location.search);
-      const session = params.get('session');
-      changeStatus(session)
+      SESSION_ID = params.get('session');
 
+      console.log(SESSION_ID);
       if (SESSION_ID !== null){
-        restore_history(session)
+        changeStatus()
+        restore_history(SESSION_ID)
         document.getElementsByTagName('body')[0].style.justifyContent = "space-between" 
       } else {
+        changeStatus()
         list_sessions()
       }
     }
@@ -208,13 +214,12 @@ Code highlights: prism.js
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         
-        
         if (SESSION_ID === null) {
           let sid = document.getElementById('new_session')
           if (sid.value === "" || sid.value === null) return
 
           console.log(sid.value);
-          window.location = `/?session=${session_id}`
+          window.location = `/?session=${sid.value}`
         } else {
           const input = event.target;
           if (!input.value.trim()) return;
@@ -283,7 +288,7 @@ Code highlights: prism.js
     <!-- Inner 680px wrapper: flex: 1 forces it to expand to fill 100dvh -->
     <div
       style="display: flex; flex-direction: column; width: 100%; max-width: 680px; 
-      flex: 1; padding-bottom: 1rem; box-sizing: border-box;">
+      flex: 1; padding-bottom: 1rem; box-sizing: border-box;margin-top: 1rem;">
 
       <div id="chat_section" style="display: flex;flex-direction: column;">
       <!-- Chat feed: margin-top: auto absorbs extra top space & anchors to bottom -->

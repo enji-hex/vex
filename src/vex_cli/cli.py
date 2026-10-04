@@ -86,7 +86,7 @@ async def run_agent(args):
         return
 
     if args.web:
-        from vex_cli.web import start_session_web
+        from vex_cli.web.server import start_session_web
         await start_session_web(args.web,settings,args.session)
         return
     
@@ -117,12 +117,12 @@ async def run_agent(args):
     # ---------------------
     
     try:
-        from vex_cli.cli import start_session
+        from vex_cli.console import start_session
         await start_session(agent, console)
     finally:
         await agent.close()
 
-def cli() -> None:
+def cli():
     # startup marker
     os.environ["VEX_START_NS"] = str(time.perf_counter_ns())
 
@@ -167,7 +167,7 @@ def cli() -> None:
     except Exception as e:
         from rich.console import Console
         Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
-        
+
         import traceback;traceback.print_exc()
     
 

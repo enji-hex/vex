@@ -50,20 +50,6 @@ class VexWeb:
         for route in list(self.app.router.routes()):
             cors.add(route)
 
-    @classmethod
-    async def create(cls,
-                     session_id:str,
-                     settings:Settings,
-                     static_dir:str = "./static",
-                     host:str = "127.0.0.1",
-                     port:int = 40_000):
-
-        v = VexWeb(session_id,settings,static_dir,host,port)
-        # start session only if present and not default
-        if session_id and session_id != "default":
-            await v.init_agent(session_id)
-        return v
-        
     async def init_agent(self,session_id):
         from vex_shell.engine import core
         from vex_shell.engine.agent import Agent
@@ -217,8 +203,11 @@ class VexWeb:
 
 
 async def start_session_web(port,settings,session_id:str):
-    app = await VexWeb.create(session_id,settings,port=port)
+    app = VexWeb(session_id,settings,"./static","127.0.0.1",port)
     await app.start()
+
+    if session_id and session_id != "default":
+        asyncio.create_task(app.init_agent(session_id))
 
     try:
         while True:
