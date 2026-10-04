@@ -134,6 +134,7 @@ Full agent functionality out of the box!!
 | `-ls`, `--list-sessions` | List all saved session IDs stored in the SQLite checkpoint database. |
 | `--reset` | Delete the local `.vex/session.db` database, clearing all cached sessions for the current workspace. |
 | `--reset-global` | Delete the global `~/.vex/session.db`, clearing session database at home directory |
+| `-w`,`--web <port, optional>` | Web interface |
 
 ## CLI Commands (available during an interactive session)
 

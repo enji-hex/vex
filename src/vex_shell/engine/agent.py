@@ -256,9 +256,9 @@ class Agent:
 
         async for event in process(stream):
             if isinstance(event,TokenUsage):
-                self.token_usage.tok_in += event.tok_in
-                self.token_usage.tok_out += event.tok_out
-                self.token_usage.tok_total += event.tok_total
+                self.token_usage.tok_in     += event.tok_in
+                self.token_usage.tok_out    += event.tok_out
+                self.token_usage.tok_total  += event.tok_total
                 LOGGER.info(
                     f"token usage for message in:{event.tok_in} out:{event.tok_out} total:{event.tok_total}"
                 )

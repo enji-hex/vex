@@ -84,6 +84,11 @@ async def run_agent(args):
     if args.list_sessions:
         await list_sessions(settings,console)
         return
+
+    if args.web:
+        from vex_cli.web import start_session_web
+        await start_session_web(args.web,settings,args.session)
+        return
     
     # Start agent
     from vex_shell.engine import core
@@ -112,7 +117,7 @@ async def run_agent(args):
     # ---------------------
     
     try:
-        from vex_cli.console import start_session
+        from vex_cli.cli import start_session
         await start_session(agent, console)
     finally:
         await agent.close()
@@ -139,6 +144,13 @@ def cli() -> None:
     parser.add_argument(
         "--list-sessions", "-ls", action="store_true", help="List saved sessions"
     )
+    parser.add_argument(
+        "--web", "-w",
+        nargs="?",
+        const=40_000,
+        default=None,
+        help="Start web session,defauly port 8000"
+    )
     parser.add_argument("--reset", action="store_true", help="reset sqlite database")
     parser.add_argument(
         "--reset-global",
@@ -146,6 +158,7 @@ def cli() -> None:
         help="reset global sqlite database (in user home)",
     )
     args = parser.parse_args()
+
     try:
         asyncio.run(run_agent(args))
     except (KeyboardInterrupt, asyncio.CancelledError):
@@ -154,6 +167,8 @@ def cli() -> None:
     except Exception as e:
         from rich.console import Console
         Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
+        
+        import traceback;traceback.print_exc()
     
 
 if __name__ == "__main__":

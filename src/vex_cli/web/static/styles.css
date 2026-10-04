@@ -1,0 +1,194 @@
+/* Custom minimal dark scrollbar */
+.sane-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sane-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sane-scrollbar::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 2px;
+}
+
+.sane-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+
+.sane-scrollbar {
+  scrollbar-width: 4px;
+  -ms-overflow-style: none;
+  scrollbar-color: #3f3f46 transparent;
+}
+
+/* Hide scrollbar completely on small screens */
+@media (max-width: 600px) {
+  .sane-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .sane-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+
+  html, body, .chat-container {
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+}
+
+
+textarea {
+  outline: none;
+  box-shadow: none;
+  background-color: #212121;
+
+  width: 100%; 
+  field-sizing: content;
+  border-radius: 16px;  
+  resize: none; 
+  padding: 1rem; 
+  box-sizing: border-box;
+  /* Prevents webkit glow effects */
+}
+
+* {
+  background-color: black;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: white;
+  font-size: medium;
+}
+
+.box {
+  border-radius: 25px;
+  padding: 15px 5px;
+  overflow-x: clip;
+  overflow-wrap: break-word;
+}
+
+pre[class*="language-"] .token,
+.box code span {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+
+/* Code block container */
+.box pre {
+  background: #141417;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.box code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Inline code (e.g. `matrix_operations.py`) */
+.box :not(pre)>code {
+  background: #1e1e24;
+  color: #f4f4f5;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+/* Markdown typography spacing */
+.box p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.box p:last-child {
+  margin-bottom: 0;
+}
+
+.box ul,
+.box ol {
+  margin: 0.5rem 0 0.75rem 1.25rem;
+}
+
+.box li {
+  margin-bottom: 0.25rem;
+}
+
+.box h1,
+.box h2,
+.box h3,
+.box h4 {
+  margin: 1rem 0 0.5rem 0;
+  font-weight: 600;
+}
+
+.tool * {
+  background: 0 0;
+}
+
+.tool {
+  background: #141417;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: none;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.code-wrapper {
+  position: relative;
+  margin: 0.8rem 0;
+}
+
+.code-wrapper pre {
+  margin: 0;
+}
+
+.cp {
+  position: absolute;
+  right: 10px;
+  bottom: 15px;
+  opacity: 0.7;
+  z-index: 2;
+  background: transparent;
+  padding: 2px;
+  border-radius: 9px;
+}
+
+.session-box {
+  width: 250px;
+  border: 1px solid white;
+  margin: auto;
+  padding: 10px;
+  text-align: center;
+  outline: none;
+}

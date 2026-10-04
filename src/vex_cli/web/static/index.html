@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- 
+Markdown rendering: marked
+Code highlights: prism.js
+-->
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./cb-css.min.css">
+  <link rel="stylesheet" href="./styles.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+  <!-- MD render -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
+
+  <!-- Prism Tomorrow Dark Theme -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+
+  <!-- Prism Core -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-julia.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-latex.min.js"></script>
+
+
+  <title>VEX-WEB</title>
+  <script>
+    let SESSION_ID = null;
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function copyClipboard(el) {
+      navigator.clipboard.writeText(el.nextElementSibling.innerText)
+      el.innerText = 'copied'
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof marked !== 'undefined') {
+        marked.use({
+          renderer: {
+            code(data, infostring) {
+              const text = typeof data === 'object' ? data.text : data;
+              const rawLang = (typeof data === 'object' ? data.lang : infostring) || '';
+              const lang = rawLang.trim().toLowerCase();
+
+              let highlighted = '';
+              let validLang = 'plaintext';
+
+              if (typeof Prism !== 'undefined' && lang && Prism.languages[lang]) {
+                validLang = lang;
+                highlighted = Prism.highlight(text, Prism.languages[lang], lang);
+              } else {
+                highlighted = escapeHtml(text);
+              }
+
+              const copyBtn = `<button onclick="copyClipboard(this)" class="cp">copy</button>`;
+              return `<div style="position:relative;margin:0.8rem 0;">${copyBtn}<pre class="language-${lang}"><code class="language-${lang}">${highlighted}</code></pre></div>`;
+            }
+          }
+        });
+      }
+    });
+
+    const ws = new WebSocket(`ws://${location.host}/ws`)
+
+    ws.onmessage = (e) => {
+      const { type, content,title } = JSON.parse(e.data)
+      if (type === "ai" || type === "tool") {
+        renderMsg(type, content,title)
+      } 
+      else if (type === "err" || type === "status") {
+        console.log(`[${type}] ${content}`);
+      }
+      document.getElementById('loader').style.display = 'none';
+    }
+
+    async function sendMsg(text) {
+      if (!text.trim()) return;
+      ws.send(JSON.stringify({ content: text }));
+
+      const loader = document.getElementById('loader');
+      const root = document.getElementById('chat-root');
+      root.appendChild(loader)
+      loader.style.display = "block"
+
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function renderMsg(from, text, title) {
+      let user_msg = document.getElementById('user-msg')
+      let ai_msg   = document.getElementById('ai-msg')
+      let tool_msg = document.getElementById('tool-msg')
+      let root = document.getElementById('chat-root')
+
+      let msg
+      if (from === "ai") { // ai message
+        msg = ai_msg.content.cloneNode(true)
+        let contentBox = msg.querySelector('.box')
+        if (typeof marked !== "undefined") {
+          contentBox.innerHTML = marked.parse(text);
+        } else {
+          contentBox.textContent = text;
+        }
+        
+      } else if (from === "tool") {
+        msg = tool_msg.content.cloneNode(true)
+        if (title !== null) {
+          msg.querySelector('h2').textContent = title;
+        }
+        msg.querySelector('pre').textContent = text;
+      } else if (from === "user") {
+        msg = user_msg.content.cloneNode(true)
+        msg.querySelector('.box').textContent = text;
+      }
+
+      root.appendChild(msg)
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function renderSession(text) {
+      let st = document.getElementById('session-template')
+      
+      let node = st.content.cloneNode(true)
+      node.querySelector('div').textContent = text;
+
+      document.getElementById('ls_section').appendChild(node)
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    async function list_sessions() {
+      resp = await fetch('/api/ls');
+      if (!resp.ok) {
+        console.log('error gather gather session list');
+        return
+      }
+      
+      for (const t of await resp.json()) {
+        renderSession(t)
+      }
+    }
+
+    async function restore_history(session) {
+      resp = await fetch(`/api/history/${session}`);
+      if (!resp.ok) {
+        console.log('error gather history');
+        return
+      }
+
+      for (const m of await resp.json()) {
+        renderMsg(m.from, m.content)
+      }
+    }
+
+    function changeStatus(session) {
+      if (session !== null) {
+        document.getElementById('chat_section').style.display = "flex"
+        document.getElementById('ls_section').style.display   = "none"
+        document.getElementById('status').textContent         = session
+        SESSION_ID = session
+      } else {
+        document.getElementById('chat_section').style.display = "none"
+        document.getElementById('ls_section').style.display   = "flex"
+        document.getElementById('status').textContent         = "LIST SESSIONS"
+      }
+    }
+
+    function onload() {
+      const params = new URLSearchParams(window.location.search);
+      const session = params.get('session');
+      changeStatus(session)
+
+      if (SESSION_ID !== null){
+        restore_history(session)
+        document.getElementsByTagName('body')[0].style.justifyContent = "space-between" 
+      } else {
+        list_sessions()
+      }
+    }
+
+    const CMDS = ["/q", "/help", "/stat", "/env", "/cached", "/read", "/del"];
+
+
+
+    const tipClick = (e) => { document.getElementById('user-input').value=e.textContent }
+    function showTips(ta) {
+      const box = document.getElementById('tips');
+      box.innerHTML = ta.value.startsWith('/') 
+        ? CMDS.filter(c => c.startsWith(ta.value))
+          .map(c => `
+          <span onclick="tipClick(this)">${c}</span> `)
+              .join('') : '';
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        
+        
+        if (SESSION_ID === null) {
+          let sid = document.getElementById('new_session')
+          if (sid.value === "" || sid.value === null) return
+
+          console.log(sid.value);
+          window.location = `/?session=${session_id}`
+        } else {
+          const input = event.target;
+          if (!input.value.trim()) return;
+          renderMsg("user", input.value)
+          sendMsg(input.value)
+          input.value = '';
+        }
+      }
+    }
+  </script>
+</head>
+
+
+<!-- TEMPLATES -->
+<template id="user-msg">
+  <div class="box" style="width: 90%;
+  background-color: #2c6732;
+  align-self: flex-end;">
+  </div>
+
+</template>
+
+<template id="ai-msg">
+  <div class="box" style="width: 100%;">
+  </div>
+</template>
+
+<template id="tool-msg">
+  <div class="box tool" style="width: 100%;">
+    <h2></h2>
+    <pre>
+    </pre>
+  </div>
+</template>
+
+<template id="session-template">
+  <div 
+  class="session-box" style="cursor: pointer;" 
+  onclick="window.location = `/?session=${this.textContent}`">
+  </div>
+</template>
+
+<div id="loader" class="spinner" style="margin: 0.5rem 0;"></div>
+
+<!-- Main body -->
+<!-- Update body inline style -->
+<body onload="onload()" 
+  style="margin: 0; min-height: 100dvh; display: flex; flex-direction: column;">
+
+  <!-- NAVBAR -->
+  <div style="width: 100%;height: 30px;display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid white;
+    align-items: anchor-center;z-index: 4;position: sticky;top: 0;">
+    <div style="padding-left: 10px;cursor: pointer;" 
+      onclick="window.location = '/'">🠜</div>
+    <div style="text-align: center;" id="status"></div>
+    <div></div>
+  </div>
+  
+
+  <!-- Outer wrapper: flex container spanning full dynamic viewport -->
+  <div style="display: flex; flex-direction: column;  
+  align-items: center; padding: 0.5rem;">
+  
+    <!-- Inner 680px wrapper: flex: 1 forces it to expand to fill 100dvh -->
+    <div
+      style="display: flex; flex-direction: column; width: 100%; max-width: 680px; 
+      flex: 1; padding-bottom: 1rem; box-sizing: border-box;">
+
+      <div id="chat_section" style="display: flex;flex-direction: column;">
+      <!-- Chat feed: margin-top: auto absorbs extra top space & anchors to bottom -->
+      <div id="chat-root" class="sane-scrollbar"
+        style="display: flex; flex-direction: column; gap: 0.2rem; margin-top: auto; 
+        margin-left: 5px; margin-right: 5px; padding-bottom: 0.5rem;">
+      </div>
+
+      <!-- Textarea sits naturally at document end -->
+      <div id="tips" style="font-family: monospace; color: #a1a1aa; cursor: pointer; padding: 4px 0;"></div>
+      <textarea id="user-input" placeholder="Type a message..." 
+        oninput="showTips(this)" onkeydown="handleKeyDown(event)"></textarea>
+      </div>
+
+      <div id="ls_section" style="display: flex;flex-direction: column;gap: 1rem;">
+          <input type="text" placeholder="session_id" id="new_session"
+            class="session-box" onkeydown="handleKeyDown(event)">
+      </div>
+
+    </div>
+  </div>
+</body>
+
+</html>

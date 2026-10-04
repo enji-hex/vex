@@ -9,6 +9,8 @@ description = "Lean AI agent that works as U expect"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiohttp>=3.14.3",
+    "aiohttp-cors>=0.8.1",
     "aiosqlite>=0.22.1",
     "dotenv>=0.9.9",
     "grandalf>=0.8",
@@ -43,4 +45,5 @@ vex = "vex_cli.cli:cli"
 where = ["src"]
 
 [tool.setuptools.package-data]
+"vex_cli.web.static" = ["*", "**/*"]
 "vex_shell.templates" = ["*"]
