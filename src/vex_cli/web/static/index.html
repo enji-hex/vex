@@ -196,18 +196,15 @@ Code highlights: prism.js
       }
     }
 
-    const CMDS = ["/q", "/help", "/stat", "/env", "/cached", "/read", "/del"];
-
-
-
-    const tipClick = (e) => { document.getElementById('user-input').value=e.textContent }
     function showTips(ta) {
+      const CMDS = ["/q", "/help", "/stat", "/env", "/cached", "/read", "/del"];
+
       const box = document.getElementById('tips');
       box.innerHTML = ta.value.startsWith('/') 
         ? CMDS.filter(c => c.startsWith(ta.value))
           .map(c => `
-          <span onclick="tipClick(this)">${c}</span> `)
-              .join('') : '';
+          <span>${c}</span> `)
+          .join('') : '';
     }
 
     function handleKeyDown(event) {
@@ -217,10 +214,9 @@ Code highlights: prism.js
         if (SESSION_ID === null) {
           let sid = document.getElementById('new_session')
           if (sid.value === "" || sid.value === null) return
-
-          console.log(sid.value);
           window.location = `/?session=${sid.value}`
         } else {
+          document.getElementById('tips').innerHTML = '';
           const input = event.target;
           if (!input.value.trim()) return;
           renderMsg("user", input.value)
@@ -313,3 +309,4 @@ Code highlights: prism.js
 </body>
 
 </html>
+

@@ -19,13 +19,13 @@ def clean_snippet(text: str, limit: int = 60) -> str:
 
 class VexWeb:
     def __init__(self,
-                 session_id:str,
                  settings:Settings,
                  static_dir:str,
                  host:str,
                  port:int,):
 
         self.agent = None
+        self.session_id = None
         self.settings = settings
         self.host  = host
         self.port  = port
@@ -64,7 +64,6 @@ class VexWeb:
 
     async def h_index(self, req: web.Request) -> web.StreamResponse:
         index_file = self.static_dir / "index.html"
-        print(index_file)
         if not index_file.is_file():
             return web.Response(text="404 Index Not Found", status=404)
         return web.FileResponse(index_file)
@@ -193,7 +192,8 @@ class VexWeb:
         site = web.TCPSite(self.runner,self.host,self.port)
         await site.start()
 
-        print(f"[VEX] Web server live on http://{self.host}:{self.port}")
+        session_str = f"?session={self.session_id}" if self.session_id else ""
+        print(f"[VEX] Web server live on http://{self.host}:{self.port}/{session_str}")
         
     async def stop(self):
         if self.runner:
@@ -203,7 +203,7 @@ class VexWeb:
 
 
 async def start_session_web(port,settings,session_id:str):
-    app = VexWeb(session_id,settings,"./static","127.0.0.1",port)
+    app = VexWeb(settings,"./static","127.0.0.1",port)
     await app.start()
 
     if session_id and session_id != "default":
