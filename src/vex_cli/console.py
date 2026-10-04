@@ -198,7 +198,6 @@ async def restore_history(agent, console: Console):
                     console.print(Markdown(c["text"], code_theme="monokai"))
                     console.print()
 
-
 async def start_session(
     agent: Agent,
     console: Console,

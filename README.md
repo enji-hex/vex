@@ -167,7 +167,10 @@ TOTAL     1633
 - [Architecture Deep Dive: Startup Time & Import Optimization](./docs/vex_startup_time_optimization.md)
 
 ## TODO
-- on-demand `write_file` appending, remove if write access denied.
+- [DONE] On-demand `write_file` appending, remove if write access denied.
+- Sandbox for foreign (MCP) tools
+- Sequential DAG workflow
+- On-The-Fly RW permission update (in CONFIG.toml)
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.
