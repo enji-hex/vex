@@ -16,5 +16,6 @@ wheels/
 */reports/
 ./sandbox/*
 .vscode/
+test/
 node_modules/
 package-lock.json
