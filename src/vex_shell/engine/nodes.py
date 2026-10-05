@@ -1,7 +1,6 @@
 from __future__ import annotations
 import logging
 from typing import List, TYPE_CHECKING
-
 import asyncio,os
 
 if TYPE_CHECKING:
@@ -26,7 +25,6 @@ async def llm_call_node(
     - No tool support
     """
     from langchain_openai import ChatOpenAI
-    from langchain_openrouter import ChatOpenRouter
     from langchain.messages import SystemMessage,HumanMessage
     from .helpers import (
         get_safe_window,
@@ -39,7 +37,7 @@ async def llm_call_node(
     llm_cfg       = settings.model
     current_calls = state.get("llm_calls", 0) + 1
 
-    # sync all loaded files
+    # sync all loaded files — returns FRESH dict with updated content
     new_files_snap = sync_loaded_files(state.get("loaded_files", {}))
     # !! Move to model scope
     cwd_tree       = sync_cwd_tree(state) if settings.chat.get('autosync_cwd_tree',False) else None
@@ -52,13 +50,19 @@ async def llm_call_node(
     
     system_msg = SystemMessage(content=settings.system_prompt)
 
-    # Handle file_context
+    # Handle file_context — use FRESH snap, not stale state
     env_block = file_access_control.build_environment_context()
-    context_blocks: list = format_file_context(
-        state,
+    context_blocks, image_paths = format_file_context(
+        new_files_snap,
         env_block,
         config.get("configurable", {}).get("use_vision", False),
+        cwd_tree=cwd_tree,
     )
+
+    if image_paths:
+        for p in image_paths:
+            new_files_snap.pop(p, None)
+        LOGGER.debug(f"Purged {len(image_paths)} image(s) from loaded_files after injection")
 
     ephemeral_context_msg = HumanMessage(
         content=[{"type": "text", "text": "--- ACTIVE FILE CONTEXT (GROUND TRUTH) ---"}]
@@ -68,40 +72,21 @@ async def llm_call_node(
 
     # reasoning
     # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
-    # timeout trigger error(maybe)
 
-    if llm_cfg["provider"] == "openrouter":
-        llm = ChatOpenRouter(
-            model=llm_cfg["name"],
-            api_key=os.environ.get("VEX_API_KEY"),
-            base_url=llm_cfg.get("llm_url", "https://openrouter.ai/api/v1"),
-            temperature=llm_cfg["temperature"],
-            max_completion_tokens=llm_cfg["max_completion_tokens"],
-            max_retries=int(llm_cfg["max_retries"]),
-            stream_usage=True,
-            streaming=True,
-            reasoning=llm_cfg.get("reasoning",{"effort":"none"}),
-            model_kwargs=llm_cfg.get("extra_body", {}),
-        )
-    elif llm_cfg["provider"] == "ollama":
-        stream_chunk_timeout = llm_cfg.get('ollama',{})\
-            .get('stream_chunk_timeout','0')
-        
-        llm = ChatOpenAI(
-            model=llm_cfg["name"],
-            base_url=llm_cfg.get("llm_url", "http://localhost:11434/v1"),
-            api_key="ollama",
-            temperature=llm_cfg["temperature"],
-            max_completion_tokens=llm_cfg.get("max_completion_tokens"),
-            max_retries=int(llm_cfg["max_retries"]),
-            streaming=True,
-            stream_usage=True,
-            stream_chunk_timeout=int(stream_chunk_timeout),
-            extra_body=llm_cfg.get("extra_body", {}),
-        )
-    else:
-        raise RuntimeError("LLM provider undefined")
-
+    stream_chunk_timeout = llm_cfg.get('ollama',{}).get('stream_chunk_timeout','0')
+    llm = ChatOpenAI(
+        model=llm_cfg["name"],
+        base_url=llm_cfg.get("llm_url", "http://localhost:11434/v1"),
+        api_key=os.environ.get("VEX_API_KEY","llama"), # fallback for local model
+        temperature=llm_cfg["temperature"],
+        max_completion_tokens=llm_cfg.get("max_completion_tokens"),
+        max_retries=int(llm_cfg["max_retries"]),
+        streaming=True,
+        stream_usage=True,
+        stream_chunk_timeout=int(stream_chunk_timeout),
+        extra_body=llm_cfg.get("extra_body"),
+        reasoning=llm_cfg.get("reasoning")
+    )
     LOGGER.info(f'extra body {llm_cfg.get("extra_body",{})}')
     llm_with_tools = llm.bind_tools(tools)
 

@@ -1,5 +1,6 @@
 from typing import (
     List,
+    Literal,
 )
 import os
 from rich.box import SQUARE
@@ -88,15 +89,13 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
     Process text only
     """
     content_str = ""
-    thinking_str = ""
     active_tools: dict[str, ToolStart] = {}
     tool_logs: list[str] = []
+    
     current_status = "VEX thinking..."
 
     def generate_temp_ui() -> Panel:
         safe_width = max(console.width - 2, 20)
-        inner_width = max(safe_width - 4, 16)
-
         to_render = []
 
         if tool_logs:
@@ -109,22 +108,6 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                 t.no_wrap = True
                 formatted_logs.append(t)
             to_render.append(Group(*formatted_logs))
-
-        if thinking_str:
-            lines = [l.strip() for l in thinking_str.splitlines() if l.strip()]
-            tail_lines = lines[-2:] if lines else ["..."]
-            tail = "\n".join(tail_lines)
-
-            to_render.append(
-                Panel(
-                    Text(tail, style="vex.muted", overflow="ellipsis"),
-                    title="[vex.think]🧠 Thinking[/vex.think]",
-                    title_align="left",
-                    border_style="vex.think",
-                    width=inner_width,
-                    box=SQUARE,
-                )
-            )
 
         if current_status:
             spinner_text = Text.from_markup(current_status, overflow="ellipsis")
@@ -151,7 +134,7 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                 active_tools[ev.tool_id] = ev
                 live.update(generate_temp_ui())
             elif isinstance(ev, ToolStop):
-                tool_start = active_tools.pop(ev.tool_id)
+                tool_start = active_tools.pop(ev.tool_id,None)
                 if tool_start:
                     out_snippet = clean_snippet(ev.tool_out) or "done"
                     in_snippet = clean_snippet(tool_start.tool_in)
@@ -161,13 +144,11 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                     )
                 current_status = "VEX is thinking..."
                 live.update(generate_temp_ui())
-            elif isinstance(ev, ReasoningDelta):
-                thinking_str += ev.text
-                current_status = "[vex.think]Thinking...[/vex.think]"
-                live.update(generate_temp_ui())
+            
             elif isinstance(ev, TextDelta):
                 content_str += ev.text
                 current_status = "[vex.prompt]Generating response...[/vex.prompt]"
+
                 live.update(generate_temp_ui())
 
         if content_str:
@@ -185,7 +166,7 @@ async def restore_history(agent, console: Console):
 
     LOGGER.info(f"found messages {len(messages)}")
     # -1 - load entire history
-    if load_last_n != -1:
+    if load_last_n > 0:
         messages = messages[-load_last_n:]
 
     for m in messages:

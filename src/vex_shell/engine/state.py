@@ -25,3 +25,4 @@ class FileData(TypedDict):
     content: str
     mtime: float
     size: int
+    tokens: int

@@ -9,21 +9,14 @@ from vex_shell.engine.agent import Agent
 from vex_shell.engine.state import FileData
 
 from dataclasses import dataclass
-import tiktoken
 
-# voice mode specific 
-import msgspec
-from multiprocessing.connection import Client
 
-def count_tokens(text: str):
-    _ENC = tiktoken.get_encoding("cl100k_base")
-    return len(_ENC.encode(text))
+
 
 class CliOutput(Enum):
     EXIT    = auto()  # requrie app exit
     SKIP    = auto()  # require next prompt
     RENDER  = auto()
-
 
 @dataclass
 class CliResult():
@@ -31,25 +24,61 @@ class CliResult():
     content: str = ""
     title: str = ""
 
-def send_msgspec(conn,data):
-    conn.send_bytes(msgspec.json.encode(data))
-
-
 def _get_state_str(b: bool):
     return "enabled" if b else "disabled"
 
+
+async def voice_mode(console:Console,prompt_session:prompt_toolkit.PromptSession) -> str:
+    import msgspec
+    from multiprocessing.connection import Client
+    
+    def send_msgspec(conn,data):
+        conn.send_bytes(msgspec.json.encode(data))
+    
+    if os.name == 'nt':
+        addr,family = r'\\.\pipe\v2t_pipe', 'AF_PIPE'
+    else:
+        addr,family = '/tmp/v2t.sock', 'AF_UNIX'
+
+    if not os.path.exists(addr):
+        raise Exception("Cannot connect to v2t daemon.\n"
+                        "Please make sure 'v2t --daemon' is running in the background.\n\n"
+                        "Docs: https://codeberg.org/Enji/v2t",
+                        "v2t Connection Error")
+
+    with Client(addr,family) as conn:
+        send_msgspec(conn,{"function":"transcribe_micro","mode":"pipe"})
+        resp = msgspec.json.decode(conn.recv_bytes())
+    
+        if resp.get('msg') != "READY":
+            raise Exception(f"error start recording, {resp.get('err')}")
+    
+        with console.capture() as cap:
+            console.print("[vex.prompt]Press Enter to stop recording... [/vex.prompt]",end="")
+            prompt_msg = prompt_toolkit.ANSI(cap.get().strip("\r\n"))
+            await prompt_session.prompt_async(prompt_msg)
+    
+            console.file.write("\x1b[1A\x1b[2K" * 2)
+            console.file.flush()
+    
+            send_msgspec(conn,{"msg":"stop"})
+            resp = msgspec.json.decode(conn.recv_bytes())
+            return resp.get('msg','')
+    
 
 async def cli_command(
     cmd: str,
     agent: Agent,
     *,
-    console:Optional[Console] = None,
-    prompt_session:Optional[prompt_toolkit.PromptSession] = None
+    console:Console,
+    prompt_session:prompt_toolkit.PromptSession
 ) -> CliResult:
     
     if cmd == "/q":
         return CliResult(CliOutput.EXIT)
     if cmd == "/stat":
+        from vex_shell.engine.helpers import count_tokens
+
         use_mcp = agent.settings.chat["use_mcp"]
         token_usage = agent.token_usage
         model_name = agent.settings.model["name"]
@@ -85,19 +114,18 @@ async def cli_command(
         TOK_W = 8
 
         if loaded:
-            file_text = "".join([f"{k}\n{v['content']}" for k, v in loaded.items()])
-            file_tokens = count_tokens(file_text)
+            file_tokens = sum([v['tokens'] for k, v in loaded.items()])
             total_tokens += file_tokens
 
             label = f"Files Context ({len(loaded)} files)"
-            tok_str = f"~{file_tokens:,}"
+            tok_str  = f"~{file_tokens:,}"
             content += f"< {label:<{LABEL_W}} {tok_str:>{TOK_W}} tokens >\n"
 
         if cwd_tree:
             tree_tokens = count_tokens(cwd_tree)
             total_tokens += tree_tokens
 
-            tok_str = f"~{tree_tokens:,}"
+            tok_str  = f"~{tree_tokens:,}"
             content += f"< {'CwdTree':<{LABEL_W}} {tok_str:>{TOK_W}} tokens >\n"
 
         content += f"\nTotal Context: ~{total_tokens:,} tokens"
@@ -140,49 +168,20 @@ async def cli_command(
         return CliResult(CliOutput.SKIP,content, "Cached Files")
 
     if cmd == "/voice":
-        if not console or not prompt_session:
-            return CliResult(CliOutput.SKIP,"Not implemented for web version","Err")
-        
-        if os.name == 'nt':
-            addr,family = r'\\.\pipe\v2t_pipe', 'AF_PIPE'
-        else:
-            addr,family = '/tmp/v2t.sock', 'AF_UNIX'
-        
-        if not os.path.exists(addr):
-            return CliResult(CliOutput.SKIP,
-                "Cannot connect to v2t daemon.\n"
-                "Please make sure 'v2t --daemon' is running in the background.\n\n"
-                "Docs: https://codeberg.org/Enji/v2t",
-                "v2t Connection Error"
-            )
-        
-        with Client(addr,family) as conn:
-            send_msgspec(conn,{"function":"transcribe_micro","mode":"pipe"})
-            resp = msgspec.json.decode(conn.recv_bytes())
-
-            if resp.get('msg') != "READY":
-                raise Exception(f"error start recording, {resp.get('err')}")
-
-            with console.capture() as cap:
-                console.print("[vex.prompt]Press Enter to stop recording... [/vex.prompt]",end="")
-            prompt_msg = prompt_toolkit.ANSI(cap.get().strip("\r\n"))
-            await prompt_session.prompt_async(prompt_msg)
-
-            console.file.write("\x1b[1A\x1b[2K" * 2)
-            console.file.flush()
-
-            send_msgspec(conn,{"msg":"stop"})
-            resp = msgspec.json.decode(conn.recv_bytes())
-            return CliResult(CliOutput.RENDER,resp.get('msg',''))
+        try:
+            text = await voice_mode(console,prompt_session)
+            return CliResult(CliOutput.RENDER,text)
+        except Exception as e:
+            return CliResult(CliOutput.SKIP,str(e))
 
     if cmd.startswith("/read"):
-        pattern = cmd.split("/read")[-1].strip()
+        pattern = cmd.split("/read ")[-1].strip()
 
         msgs = await agent.read_files(pattern)
         return CliResult(CliOutput.SKIP,"\n".join(msgs), f"Manual Read {pattern}")
 
-    if cmd.startswith("/del"):
-        pattern = cmd.split("/del")[-1].strip()
+    if cmd.startswith("/del "):
+        pattern = cmd.split("/del ")[-1].strip()
 
         msgs = await agent.purge_files(pattern)
         return CliResult(CliOutput.SKIP,"\n".join(msgs), f"Manual Cache Clear {pattern}")

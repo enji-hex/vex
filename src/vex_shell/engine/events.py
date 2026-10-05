@@ -13,11 +13,6 @@ class ToolStop:
     tool_out: str
 
 @dataclass
-class ReasoningDelta:
-    text: str
-
-
-@dataclass
 class TextDelta:
     text: str
 
@@ -27,4 +22,4 @@ class TokenUsage:
     tok_out: int = 0
     tok_total: int = 0
 
-AgentEvent = Union[ToolStart, ToolStop, ReasoningDelta, TextDelta, TokenUsage]
+AgentEvent = Union[ToolStart, ToolStop, TextDelta, TokenUsage]

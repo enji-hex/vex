@@ -1,4 +1,4 @@
-logging_level = "info"
+logging_level = "debug"
 
 [chat]
 # control imported MCP tools only, core tools available always, 
@@ -9,7 +9,7 @@ use_mcp =  false
 load_last_n =  10
 
 # keep/hide tool-info boxes
-keep_tool_logs =  false
+keep_tool_logs =  true
 
 custom_cwd = ""             # optional
 autosync_cwd_tree = true
@@ -21,10 +21,8 @@ check_command = ""
 observe_command = ""
 
 [model]
-# ollama / openrouter
-provider = "openrouter"
-# optional 
-# llm_url = "http://localhost:11434/v1"
+# used ChatOpenAI
+llm_url = "https://openrouter.ai/api/v1"
 
 use_vision = false # optional,image read support
 name = "dots-studio/dots-3-note-preview:free"
@@ -45,7 +43,7 @@ max_retries = 3
 # empty patterns, no access at all
 
 patterns = [
-    "r ./**"
+    "r ./src/**"
 ]
 
 
@@ -53,14 +51,13 @@ patterns = [
 # ollama provider timeout, set to 0 for disabling
 stream_chunk_timeout=0
 
-# https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
-[model.reasoning] # optional
-# max_tokens = 20000
-# effort = "medium"
-
-
 [model.extra_body] # optional
 repetition_penalty = 1.2
+
+# https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+[model.reasoning]
+effort = "high"
+
 
 # [model.extra_body.provider]
 # data_collection = "deny"

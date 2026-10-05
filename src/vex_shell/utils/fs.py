@@ -16,6 +16,8 @@ def sync_cwd_tree(state: State) -> str:
 
 def sync_loaded_files(loaded_files: dict[str, FileData]) -> dict[str, FileData]:
     """Autosync all files loaded in chat context"""
+    from vex_shell.engine.helpers import count_tokens
+
     if not loaded_files:
         return {}
 
@@ -43,7 +45,8 @@ def sync_loaded_files(loaded_files: dict[str, FileData]) -> dict[str, FileData]:
             updated_files[rel_path] = FileData(
                 content=new_content, 
                 mtime=stat.st_mtime_ns, 
-                size=stat.st_size
+                size=stat.st_size,
+                tokens=count_tokens(new_content),
             )
             LOGGER.info(f"Autosync file:{rel_path}")
             modified = True

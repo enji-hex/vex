@@ -65,9 +65,12 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
             else:
                 continue
 
+            LOGGER.debug(f'messages {msg_data}')
+
             if not isinstance(msg_data, dict) or not isinstance(graph_meta, dict):
                 continue
             event_type = msg_data.get("event")
+
 
             # message
             block = msg_data.get("fields") or msg_data.get("delta") or {}
@@ -77,15 +80,7 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
                 text = block.get("text", "")
                 if text:
                     yield TextDelta(text)
-            elif delta_type in ("reasoning-delta", "reasoningch"):
-                reasoning = (
-                    block.get("reasoning")
-                    or block.get("reasoning_content")
-                    or block.get("text", "")
-                )
-                if reasoning:
-                    yield ReasoningDelta(reasoning)
-
+            
             if event_type == "message-finish" and "usage" in msg_data:
                 usage = msg_data["usage"]
                 yield TokenUsage(

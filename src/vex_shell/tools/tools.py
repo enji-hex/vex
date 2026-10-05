@@ -17,6 +17,7 @@ from vex_shell.utils.config import LOGGER
 from vex_shell.utils.file_access import file_access_control
 from vex_shell.engine.state import FileData
 
+
     
 # 
 # CORE tools packet
@@ -72,6 +73,7 @@ def _read_files(
     """
     Return loaded files dict, messages
     """
+    from vex_shell.engine.helpers import count_tokens
 
     use_vision = config.get('configurable',{}).get('use_vision',False)
     cwd = Path(file_access_control.cwd)
@@ -93,19 +95,23 @@ def _read_files(
                 continue
 
             suffix   =  target.suffix.lower().lstrip('.')
+            tokens = 0
             if suffix in ["jpg", "jpeg", "webp", "png"] and use_vision:
                 content = read_image(target)            
                 line_info = "image/base64"
-                LOGGER.info(f'read_file image  {content}')
+                LOGGER.debug(f'read_file image  {len(content)}')
             else:
                 content = target.read_text(encoding='utf-8')
                 line_info = f"{len(content.splitlines())} lines"
+                tokens = count_tokens(content)
 
             stat = target.stat()
             loaded[rel_path] = FileData(
                 content=content,
                 size=stat.st_size,
-                mtime=stat.st_mtime_ns)
+                mtime=stat.st_mtime_ns,
+                tokens=tokens
+                )
             msgs.append(f"cached '{p}' ({line_info})")
         except Exception as err:
             msgs.append(f"read_files: {err}")
@@ -150,6 +156,7 @@ async def write_file(
     Create parent folder if it doesn't exist
     """
     from langchain_core.messages import ToolMessage
+    from vex_shell.engine.helpers import count_tokens
 
     cache_on_write = config.get('configurable',{}).get('cache_on_write',False)
 
@@ -177,7 +184,9 @@ async def write_file(
         new_file_ctx = {rel_path:FileData(
             content=content,
             size=target_stat.st_size,
-            mtime=target_stat.st_mtime_ns)}
+            mtime=target_stat.st_mtime_ns,
+            tokens=count_tokens(content)
+            )}
         return Command(
             update={
                 "loaded_files": new_file_ctx,

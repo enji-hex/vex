@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import uuid
-from typing import Any, Dict, List,TYPE_CHECKING
+from typing import Any, Dict, List,TYPE_CHECKING, Tuple
 from vex_shell.utils.config import LOGGER
 
 if TYPE_CHECKING:
     from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
-    from .state import State
+    from .state import State, FileData
 
 async def get_saved_sessions(db_path:str|Path) -> list[str]:
     import aiosqlite
@@ -49,22 +49,27 @@ def get_safe_window(messages:list, target_window:int) -> list:
     return pruned
 
 def format_file_context(
-        state:State,
-        env_block:str,
-        use_vision:bool
-    ) -> List[Dict[str,Any]]:
+        loaded_files: Dict[str, FileData],
+        env_block: str,
+        use_vision: bool,
+        cwd_tree: str | None = None,
+    ) -> Tuple[List[Dict[str,Any]],List[str]]:
+    """
+    Build context blocks from the *already-synced* loaded_files dict.
+    Returns (content_blocks, image_paths) where image_paths is a list of
+    keys that were injected as images and should be purged afterwards.
+    """
 
     content_blocks = []
+    image_paths: list[str] = []
+
     header_text = (
         f"{env_block}\n"
         f"--- ACTIVE WORKING CONTEXT (GROUND TRUTH) ---\n"
         f"### Active Working Context (Latest File Versions)\n"
     )
-
-    loaded_files = state.get("loaded_files")
-    cwd_tree     = state.get('cwd_tree')
-    
     content_blocks.append({"type":"text","text":header_text})
+
     for path, info in loaded_files.items():
         if info['content'].startswith("data:image/"):
             if use_vision:
@@ -76,6 +81,7 @@ def format_file_context(
                     "type":"image_url",
                     "image_url":{"url":info['content']}
                 })
+                image_paths.append(path)
             else:
                 content_blocks.append({
                     "type": "text", 
@@ -93,7 +99,7 @@ def format_file_context(
         })
     
     LOGGER.debug(str(content_blocks))
-    return content_blocks
+    return content_blocks, image_paths
 
 
 def normalize_tool_calls(msg:AIMessage,tool_names:List[str]) -> AIMessage:
@@ -116,3 +122,11 @@ def normalize_tool_calls(msg:AIMessage,tool_names:List[str]) -> AIMessage:
 
     if calls: msg.tool_calls, msg.content = calls,""
     return msg
+
+_ENC = None
+def count_tokens(text: str) -> int:
+    import tiktoken
+    global _ENC
+    if not _ENC:
+        _ENC  = tiktoken.get_encoding("cl100k_base")
+    return len(_ENC.encode_ordinary(text))
