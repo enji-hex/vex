@@ -54,7 +54,7 @@ class Settings:
         
         self.model: Dict[str, Any] = cfg["model"]
         self.chat: Dict[str, Any] = cfg["chat"]
-        self.permissions: Dict[str, List[str]] = cfg["model"]["permissions"]
+        self.permissions: Dict[str, List[str]] = cfg["permissions"]
         self.config_path = p.as_posix()
         self.db_path = (Path(p) / "session.db").as_posix()
 

@@ -34,7 +34,7 @@ max_completion_tokens = 8000
 timeout =  60
 max_retries = 3
 
-[model.permissions]
+[permissions]
 # r - read, w - write access
 # USE
 # ./* for current directory file access
