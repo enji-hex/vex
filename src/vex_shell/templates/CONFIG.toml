@@ -43,7 +43,7 @@ max_retries = 3
 # empty patterns, no access at all
 
 patterns = [
-    "r ./src/**"
+    "r */**"
 ]
 
 
@@ -56,8 +56,7 @@ repetition_penalty = 1.2
 
 # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
 [model.reasoning]
-effort = "high"
-
+effort = "medium"
 
 # [model.extra_body.provider]
 # data_collection = "deny"

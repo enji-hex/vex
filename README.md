@@ -168,9 +168,8 @@ TOTAL     1633
 
 ## TODO
 - [DONE] On-demand `write_file` appending, remove if write access denied.
-- Sandbox for foreign (MCP) tools
-- Sequential DAG workflow
 - On-The-Fly RW permission update (in CONFIG.toml)
+- Sequential DAG workflow
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.

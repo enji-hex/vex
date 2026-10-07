@@ -197,32 +197,56 @@ async def write_file(
             }
         )
     return msg_text
-    
 
-def _glob_tool(glob_patterns: List[str]) -> List[str]:
+def _insensitive_glob(pattern,**kwargs):
+    """
+    Transform each letter in pattern in two cases D -> [dD]
+    Text -> [tT][eE][xX][tT]
+    """
+    def either(c):
+        return '[%s%s]' % (c.lower(),c.upper()) if c.isalpha() else c
+    return glob.glob(
+        ''.join(map(either,pattern)),
+        **kwargs)
+
+
+def _glob_tool(
+        glob_patterns: List[str]
+        ) -> List[str]:
+    
     matches: list[str] = []
     LOGGER.debug(f'glob_tool {str(glob_patterns)}')
-    cwd  = Path(file_access_control.cwd)
+    cwd  = Path(file_access_control.cwd).resolve()
     spec = get_gitignore_spec(cwd)
 
     for g in glob_patterns:  # handle multientry glob
         is_abs = Path(g).is_absolute()
-        
-        for path_str in glob.glob(g, 
+
+        founded_path = _insensitive_glob(g,
             root_dir=None if is_abs else cwd,
             recursive=True,
-            include_hidden=False
-            ):
+            include_hidden=False,
+        )
+
+        LOGGER.debug('patterns '+str(founded_path))
+        for path_str in founded_path:
             full_path = Path(path_str) if is_abs else cwd / path_str
+            
             try:
                 safe_path = file_access_control.validate_read(full_path.as_posix())
                 rel_path  = get_rel_str(safe_path,cwd)
+
                 if safe_path.is_file() and not spec.match_file(rel_path):
                     matches.append(rel_path)
-            except (PermissionError,ValueError):
+            except (PermissionError,ValueError) as e:
                 continue
+            except Exception as e:
+                LOGGER.error(e,exc_info=True)
 
-    return matches
+    uniqueq_mathes = list(dict.fromkeys(matches))
+    LOGGER.info(f'glob found {len(uniqueq_mathes)} files')
+    return uniqueq_mathes
+
 
 @tool
 def glob_tool(glob_patterns: List[str]) -> str:
