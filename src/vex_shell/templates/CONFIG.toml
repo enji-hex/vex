@@ -5,11 +5,12 @@ logging_level = "debug"
 # Important MCP tools NOT restricted by R/W permission management
 use_mcp =  false
 
+
 # count of messages loaded in console (not sliding window)
 load_last_n =  10
 
 # keep/hide tool-info boxes
-keep_tool_logs =  true
+keep_tool_logs =  false
 
 custom_cwd = ""             # optional
 autosync_cwd_tree = true
@@ -17,15 +18,17 @@ cache_on_write    = false   # Auto read each file written by LLM
 theme = "Land-of-Ooo"
 
 [verification]
-check_command = ""
+check_command   = ""
 observe_command = ""
 
 [model]
 # used ChatOpenAI
-llm_url = "https://openrouter.ai/api/v1"
+llm_url = "https://nano-gpt.com/api/v1"
+# proxy="socks5://127.0.0.1:20170"
+max_llm_calls = 3
 
 use_vision = false # optional,image read support
-name = "dots-studio/dots-3-note-preview:free"
+name = "openai/gpt-6-luna-pro"
 
 # set to -1 set infinity length
 context_sliding_window = 10 # default 10
@@ -43,7 +46,7 @@ max_retries = 3
 # empty patterns, no access at all
 
 patterns = [
-    "r */**"
+    "r */**",
 ]
 
 
@@ -55,8 +58,9 @@ stream_chunk_timeout=0
 repetition_penalty = 1.2
 
 # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
-[model.reasoning]
-effort = "medium"
+# [model.reasoning]
+# effort = "high"
+
 
 # [model.extra_body.provider]
 # data_collection = "deny"

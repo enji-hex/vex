@@ -27,17 +27,12 @@ language models. It combines LangChain, LangGraph, and OpenRouter(or ollama) to 
 - **Token Tracking & UI Themes** – Built-in /stat metrics and customizable Rich terminal themes (Fallout, Cyberpunk, EVA-03).
 
 
-## TL;DR (News)
-- Added `llama.cpp` support (compatible with any Hugging Face GGUF model).
-- Fixed `extra_body` argument injection for the Ollama provider.
-
-
 ## Quick Start
 
 ### As Tool
 ```bash
 # Install directly from the repository (no manual clone needed)
-uv tool install "git+https://codeberg.org/Enji/vex.git#egg=vex_shell[cli]"
+uv tool install "git+https://codeberg.org/Enji/vex.git"
 
 # Initialize global config folder ~/.vex
 vex
@@ -45,26 +40,15 @@ vex
 # Initialise a local workspace in the current directory
 vex --init
 
-# Set your API key (required for OpenRouter or other providers)
-#   • Global: edit ~/.vex/.env
-#   • Local : edit .vex/.env
+# Set your API key (required for OpenRouter,nanoGPT or other providers)
+#   Global: edit ~/.vex/.env
+#   Local : edit .vex/.env
 # Example content:
 #   VEX_API_KEY="your‑api‑key‑here"
 
 # Start an interactive session (uses the local .vex if present, otherwise the global one)
 vex
 ```
-
-### Provider Configuration Notes
-
-> Both **Ollama** and **llama.cpp** uses ollama as provider, cause of identical `ChatOpenAI` interface.
-
-**Ollama**
-- `custom_url` is optional (defaults to `http://localhost:11434/v1`).
-
-**llama.cpp**
-- Set port to `11434` or update `custom_url` in `CONFIG.toml`.
-- Set `stream_chunk_timeout=0` to disable timeouts and prevent request errors.
 
 
 ### As Python Library
@@ -78,20 +62,20 @@ from vex_shell.engine.core import build_graph, get_tools
 from vex_shell.engine.agent import Agent
 from vex_shell.utils.config import Settings
 from vex_shell.utils.file_access import file_access_control
-from vex_shell.ui import events
+from vex_shell.engine import events
 
 import asyncio
 
 async def main():
+    # file access control reconfigured inside settings
     settings = Settings() # default settings for agent from .vex/CONFIG.toml
-    # reconfigure file_access with respect to selected config
-    file_access_control.reconfigure(settings)
+    
     # gather tools and mcp_manager ( control foreign tools )
     tools,mcp_manager = await get_tools(settings)
 
     # build graph for an Agent
     graph = build_graph(settings,tools)
-    agent = await Agent.create(graph,"4",settings,mcp_manager)
+    agent = await Agent.create(graph,"session-name",settings,mcp_manager)
     
     # We are ready to start
     stream = agent.run_step("read ./main.py and print here")
@@ -112,8 +96,10 @@ if __name__ == "__main__":
 
 Full agent functionality out of the box!!
 
-**Note**: The ReasoningDelta event is currently supported only when using the OpenRouter provider. Refer to [events.py](./src/vex_shell/ui/events.py) for the complete event schema.
+## Security Note
 
+> File-access permissions apply to VEX’s built-in file tools only. They do not restrict MCP tools or commands configured under check_command and observe_command. \
+>  These commands execute in the working directory; configure only trusted MCP servers and commands.
 
 ## Example Workflow
 1. `read_files path/to/module.py` – caches the file in the active context.
@@ -121,9 +107,9 @@ Full agent functionality out of the box!!
 3. VEX injects the cached file into the prompt, the LLM returns the refactored code and writes back to  `module.py` with  `write_file` tool. 
 
 ## Extending VEX
-- **Custom Tools**: Add standard LangChain tools inside src/vex_shell/engine/tools.py.
+- **Custom Tools**: Add standard LangChain tools inside src/vex_shell/tools/tools.py.
 - **MCP Servers**: Configure external Model Context Protocol endpoints inside .vex/mcp_config.json.
-- **UI Themes**: Define custom terminal color schemes inside src/vex_shell/ui/colors.py.
+- **UI Themes**: Define custom terminal color schemes inside src/vex_cli/colors.py.
 
 ## CLI Flags
 
@@ -132,6 +118,7 @@ Full agent functionality out of the box!!
 | `-i`, `--init` | Initialise a new `.vex` workspace (creates folder and template files). |
 | `-s`, `--session <name>` | Choose a session identifier; defaults to `default`. |
 | `-ls`, `--list-sessions` | List all saved session IDs stored in the SQLite checkpoint database. |
+| `-lt`, `--list-themes`   | List available color themes. |
 | `--reset` | Delete the local `.vex/session.db` database, clearing all cached sessions for the current workspace. |
 | `--reset-global` | Delete the global `~/.vex/session.db`, clearing session database at home directory |
 
@@ -145,21 +132,22 @@ Full agent functionality out of the box!!
 | `/stat` | Display token usage statistics (input, output, total) and the model being used. |
 | `/env` | Reveal the path of the loaded environment configuration file (`.env`). |
 | `/help` | Show the help screen with available slash commands. |
+| `/voice` | Voice input integration, works only with [v2t](https://codeberg.org/Enji/v2t) app in daemon mode. |
 | `/q` | Quit the current VEX session. |
 
 
-## Metrics
+## **Metrics (8.10.2026)**
 
 - **Footprint**
 ```
 ---------------------
 Module    LOC
-VEX_SHELL 1092
-VEX_CLI   541
-TOTAL     1633
+VEX_SHELL 1221
+VEX_CLI   545
+TOTAL     1766
 ---------------------
 ```
-- **Start time:** ~2s
+- **Start time:** ~2.12s
 - **utility functions (-ls/--help):** ~400ms
 
 ## Additional Documentation
@@ -168,8 +156,7 @@ TOTAL     1633
 
 ## TODO
 - [DONE] On-demand `write_file` appending, remove if write access denied.
-- On-The-Fly RW permission update (in CONFIG.toml)
-- Sequential DAG workflow
+- [DONE] On-The-Fly RW permission update (in CONFIG.toml)
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.

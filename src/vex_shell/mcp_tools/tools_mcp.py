@@ -1,15 +1,16 @@
-import asyncio
+import json
+import os
+import time
 from contextlib import AsyncExitStack
-from typing import Any, Dict, List, Tuple
+from typing import Any
+
 from langchain_core.tools import BaseTool
 from mcp import ClientSession, StdioServerParameters
-
-from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
+from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
-import time
-import json, os
 from pydantic import BaseModel, Field, create_model
+
 from vex_shell.utils.config import LOGGER
 
 # JSON mcp types to python types
@@ -22,7 +23,7 @@ JSON_TYPE_MAP: dict[str, type] = {
     "object": dict,
 }
 
-def sanitize_arguments(raw_args: Dict[str, Any]) -> Dict[str, Any]:
+def sanitize_arguments(raw_args: dict[str, Any]) -> dict[str, Any]:
     if isinstance(raw_args, BaseModel):
         raw_args = raw_args.model_dump(exclude_none=True)
 
@@ -153,7 +154,7 @@ class MCPManager:
             LOGGER.warning(f"Error during MCP cleanup {e}")
 
 
-async def load_mcp_tools() -> Tuple[List[BaseTool],MCPManager]:
+async def load_mcp_tools() -> tuple[list[BaseTool],MCPManager]:
     mcp_manager = MCPManager()
     conf_path  = os.path.join(os.getcwd(), ".vex/mcp_config.json")
     

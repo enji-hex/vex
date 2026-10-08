@@ -1,8 +1,7 @@
-from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.key_binding import KeyBindings
-
 from rich.console import Console
 
 

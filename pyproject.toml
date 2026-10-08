@@ -27,11 +27,15 @@ dependencies = [
     "selectolax>=0.4.11",
     "prompt-toolkit>=3.0.52",
     "rich>=15.0.0",
+    "socksio>=1.0.0",
 ]
 
-# CLI module
-[project.optional-dependencies]
-cli = []
+[tool.ruff.lint]
+# Ignore executable bit issues and legacy typing rule globally
+ignore = [
+    "EXE002",  # Missing shebang on executable file
+]
+
 
 [project.scripts]
 vex = "vex_cli.cli:cli"

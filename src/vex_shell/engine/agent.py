@@ -1,30 +1,27 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import (
-    AsyncIterator,
-    List,
-    Optional,
-    Self,
-    TYPE_CHECKING
-)
 import warnings
-import aiosqlite
+from collections.abc import AsyncIterator
 from fnmatch import fnmatch
-from vex_shell.utils.file_access import file_access_control
-from vex_shell.utils.config import LOGGER,Settings
-from vex_shell.engine.events import *
+from pathlib import Path
+from typing import TYPE_CHECKING, Self
 
+import aiosqlite
 from langchain_core._api.beta_decorator import LangChainBetaWarning
+
+from vex_shell.engine.events import *
+from vex_shell.utils.config import LOGGER, Settings
+from vex_shell.utils.file_access import file_access_control
 
 warnings.simplefilter("ignore", category=LangChainBetaWarning)
 
 # import only for type checking
 if TYPE_CHECKING:
     from langchain_core.messages import AnyMessage
-    from vex_shell.tools.tools import _glob_tool,_read_files
-    from langgraph.graph.state import StateGraph,CompiledStateGraph
+    from langgraph.graph.state import CompiledStateGraph, StateGraph
+
     from vex_shell.mcp_tools.tools_mcp import MCPManager
+    from vex_shell.tools.tools import _glob_tool, _read_files
 
 def _glob_tool(*args,**kwargs):
     from vex_shell.tools.tools import _glob_tool as real_fn
@@ -96,7 +93,7 @@ class Agent:
         session_id: str,
         settings: Settings,
         conn: aiosqlite.Connection,
-        mcp_manager: Optional[MCPManager] = None,
+        mcp_manager: MCPManager | None = None,
     ) -> None:
         from langchain_core.runnables import RunnableConfig
 
@@ -119,7 +116,7 @@ class Agent:
         graph:StateGraph,
         session_id:str,
         settings:Settings,
-        mcp_manager:Optional[MCPManager] = None
+        mcp_manager:MCPManager | None = None
     ) -> Self:
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
@@ -132,16 +129,24 @@ class Agent:
         await agent.restore_token_usage()
         return agent
 
-    
+
+    async def reconfigure_settings(self):
+        self.settings._configure() # fa_control reconfigured inside 
+        self.config['configurable'].update({
+            "use_vision":self.settings.model.get("use_vision", False),
+            "cache_on_write":self.settings.chat.get("cache_on_write", False),
+        })
+
+
     async def get_state(self):
         return await self.graph.aget_state(self.config)
 
-    async def read_files(self,pattern:str) -> List[str]:
+    async def read_files(self,pattern:str) -> list[str]:
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
 
         files = _glob_tool([pattern])
-        LOGGER.info(f'glob found {str(files)} files')
+        LOGGER.info(f'glob found {files!s} files')
         
         loaded,msgs = _read_files(files,self.config,state_values)
         update_payload:dict = {"loaded_files":loaded}
@@ -156,7 +161,7 @@ class Agent:
         LOGGER.info(f'manual caching, cached total {len(loaded)} files')
         return msgs
     
-    async def purge_files(self,pattern:str) -> List[str]:
+    async def purge_files(self,pattern:str) -> list[str]:
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
         cwd = Path(file_access_control.cwd)
@@ -213,9 +218,9 @@ class Agent:
         
         return self.token_usage
     
-    async def restore_history(self) -> List[AnyMessage]:
+    async def restore_history(self) -> list[AnyMessage]:
         state = await self.get_state()
-        messages:Optional[List[AnyMessage]] = state.values.get("messages")
+        messages:list[AnyMessage] | None = state.values.get("messages")
         if not messages:
             return []
         
@@ -239,11 +244,15 @@ class Agent:
 
 
     async def run_step(self,user_input:str) -> AsyncIterator[AgentEvent]:
+        from langchain_core.messages import HumanMessage
         from langgraph.prebuilt import ToolCallTransformer
-        from langchain_core.messages import HumanMessage,SystemMessage
 
+        # reset llm_calls
         stream = await self.graph.astream_events(
-            {"messages": [HumanMessage(content=user_input)]},
+            {
+                "messages": [HumanMessage(content=user_input)],
+                "llm_calls":0,
+                },
             config=self.config,
             version="v3",
             transformers=[ToolCallTransformer],

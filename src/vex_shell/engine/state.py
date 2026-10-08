@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Dict, TypedDict
+from typing import Annotated, TypedDict
+
 from langgraph.graph.message import add_messages
+
 
 def merge_dict_state(left: dict | None, right: dict | None) -> dict:
     new_ctx = (left or {}).copy()
@@ -17,7 +19,7 @@ def merge_dict_state(left: dict | None, right: dict | None) -> dict:
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-    loaded_files: Annotated[Dict[str, FileData],merge_dict_state]
+    loaded_files: Annotated[dict[str, FileData],merge_dict_state]
     cwd_tree: str
     llm_calls: int
 
@@ -25,4 +27,3 @@ class FileData(TypedDict):
     content: str
     mtime: float
     size: int
-    tokens: int

@@ -1,7 +1,7 @@
 from __future__ import annotations
-from functools import partial
-from typing import List, Optional, Tuple, TYPE_CHECKING
 
+from functools import partial
+from typing import TYPE_CHECKING
 
 # from langgraph.graph import START, END 
 # thi shit imports ENTIRE langgraph.graph module!!!
@@ -11,13 +11,14 @@ START = "__start__"
 # import only for type checking
 if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
+    from langgraph.graph.state import StateGraph
+
     from vex_shell.mcp_tools.tools_mcp import MCPManager
-    from langgraph.graph.state import  StateGraph
     from vex_shell.utils.config import Settings
-    from .state import State
+
     
 
-async def get_tools(settings:Settings) -> Tuple[List[BaseTool], Optional[MCPManager]]:
+async def get_tools(settings:Settings) -> tuple[list[BaseTool], MCPManager | None]:
     from ..tools.tools import get_tools
     tools = get_tools()
     if settings.chat["use_mcp"]:
@@ -30,11 +31,11 @@ async def get_tools(settings:Settings) -> Tuple[List[BaseTool], Optional[MCPMana
         
     return tools,mcp_manager
 
-def build_graph(settings: Settings, tools:List[BaseTool]) -> StateGraph:
-    from langgraph.graph.state import  StateGraph
+def build_graph(settings: Settings, tools:list[BaseTool]) -> StateGraph:
+    from langgraph.graph.state import StateGraph
     from langgraph.prebuilt import ToolNode
 
-    from .nodes import llm_call_node, verification_node, should_continue, should_verify
+    from .nodes import llm_call_node, should_continue, should_verify, verification_node
     from .state import State
     
     graph = StateGraph(State)
@@ -50,8 +51,8 @@ def build_graph(settings: Settings, tools:List[BaseTool]) -> StateGraph:
     graph.add_edge(START, "llm_call")
     graph.add_conditional_edges("llm_call", should_continue, ["tool_node", END])
     graph.add_conditional_edges(
-        "tool_node",  # source node
-        should_verify,  # check condition
+        "tool_node",    # source node
+        partial(should_verify,settings=settings),  # check condition
         # path maps
         # llm_call str -> route to llm_call function
         {"verification_node": "verification_node", "llm_call": "llm_call"},

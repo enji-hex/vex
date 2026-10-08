@@ -1,10 +1,12 @@
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Tuple
-from rich.theme import Theme
-from importlib import resources
 import csv
+from dataclasses import dataclass
+from importlib import resources
+from pathlib import Path
+
+from rich.theme import Theme
+
 from vex_shell.utils.config import LOGGER
+
 
 @dataclass
 class Palette:
@@ -26,13 +28,13 @@ class Palette:
             }
         )
 
-def load_theme(theme_name:str) -> Tuple[Palette | None, List[str]]:
+def load_theme(theme_name:str) -> tuple[Palette | None, list[str]]:
     user_themes     = Path().home() / ".vex" / "themes.csv"
     themes = []
     sel_theme = None
 
     if user_themes.exists():
-        LOGGER.info(f'load user themes.csv')
+        LOGGER.info('load user themes.csv')
         file = user_themes.read_text()
     else:
         file = (

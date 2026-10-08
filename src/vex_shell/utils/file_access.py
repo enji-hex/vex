@@ -1,11 +1,10 @@
 from __future__ import annotations
+
 import asyncio
+import fnmatch
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Literal, Optional,TYPE_CHECKING
-import fnmatch
-import logging
-from vex_shell.utils.config import LOGGER
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from .config import Settings
@@ -20,7 +19,7 @@ class FileAccessControl:
         return self.write_locks[path.resolve()]
 
 
-    def reconfigure(self, settings: Optional[Settings] = None):
+    def reconfigure(self, settings: Settings | None = None):
         """Configures file access permissions.
 
         - ['*'] grants full access (unrestricted system-wide).
@@ -65,10 +64,6 @@ class FileAccessControl:
         # Check patterns
         self.read_patterns  = self._strip_rel(read_patterns)
         self.write_patterns = self._strip_rel(write_patterns)
-
-        if LOGGER.level == logging.DEBUG:
-            env_block = self.build_environment_context()
-            LOGGER.debug(env_block)
                 
     def _strip_rel(self, lst: list[str]) -> list[str]:
         res = []
@@ -80,7 +75,7 @@ class FileAccessControl:
                 f'Invalid scope pattern "{l}": Bare "." or "./" matches only the directory node, '
                 'not its files. Did you mean "./*" (immediate files) or "./**" (recursive)?'
                 )
-            elif cleaned.endswith('/') or cleaned.endswith('\\'):
+            elif cleaned.endswith(('/','\\')):
                 cleaned = cleaned.rstrip('/\\') + '/*'
 
             res.append(cleaned)
@@ -111,7 +106,7 @@ class FileAccessControl:
     def _validate(
         self,
         path: str,
-        patterns: List[str],
+        patterns: list[str],
         full_access: bool,
         ac_type: Literal["read", "write"],
     ):
@@ -131,7 +126,7 @@ class FileAccessControl:
 
         raise PermissionError(f"{ac_type.capitalize()} access denied for path: {path}")
 
-    def _build_perm(self,full_access:bool,patterns:List[str]):
+    def _build_perm(self,full_access:bool,patterns:list[str]):
         if full_access:
             return "ALL (*)"
         elif patterns:
@@ -155,7 +150,6 @@ ENVIRONMENT METADATA:
 - Permitted Read Scopes:  {read_perm}
 - Permitted Write Scopes: {write_perm}
 """.strip()
-
 
 # initialize fa_control
 file_access_control = FileAccessControl()

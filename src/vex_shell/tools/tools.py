@@ -1,24 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
-import os
 import glob
-from langchain.tools import InjectedState, InjectedToolCallId
-from langgraph.types import Command
-from langchain_core.tools import BaseTool, tool
-
-from langchain_core.runnables import RunnableConfig
-from typing import Annotated, Dict, List, Tuple
-
 import io
-import pathspec
+import os
+from pathlib import Path
+from typing import Annotated
 
+import pathspec
+from langchain.tools import InjectedState, InjectedToolCallId
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import BaseTool, tool
+from langgraph.types import Command
+
+from vex_shell.engine.state import FileData
 from vex_shell.utils.config import LOGGER
 from vex_shell.utils.file_access import file_access_control
-from vex_shell.engine.state import FileData
 
-
-    
 # 
 # CORE tools packet
 # 
@@ -42,6 +39,7 @@ def get_rel_str(p: Path, cwd: Path) -> str:
 
 def read_image(path:Path,max_dim: int = 1024) -> str:
     from base64 import b64encode
+
     from PIL import Image
 
     with Image.open(path) as img:
@@ -66,20 +64,17 @@ def read_image(path:Path,max_dim: int = 1024) -> str:
     return f'data:image/jpeg;base64,{b64_data}'
 
 def _read_files(
-    paths: List[str],
+    paths: list[str],
     config: RunnableConfig,
     state: dict,
-) -> Tuple[Dict[str,FileData] ,List[str]]:
-    """
-    Return loaded files dict, messages
-    """
-    from vex_shell.engine.helpers import count_tokens
+) -> tuple[dict[str,FileData] ,list[str]]:
+    """ Return loaded files dict, messages """
 
     use_vision = config.get('configurable',{}).get('use_vision',False)
     cwd = Path(file_access_control.cwd)
     spec = get_gitignore_spec(cwd)
 
-    loaded:Dict[str,FileData] = dict(state.get("loaded_files",{}))
+    loaded:dict[str,FileData] = dict(state.get("loaded_files",{}))
     msgs =  []
 
     for p in paths:
@@ -95,7 +90,6 @@ def _read_files(
                 continue
 
             suffix   =  target.suffix.lower().lstrip('.')
-            tokens = 0
             if suffix in ["jpg", "jpeg", "webp", "png"] and use_vision:
                 content = read_image(target)            
                 line_info = "image/base64"
@@ -103,14 +97,12 @@ def _read_files(
             else:
                 content = target.read_text(encoding='utf-8')
                 line_info = f"{len(content.splitlines())} lines"
-                tokens = count_tokens(content)
 
             stat = target.stat()
             loaded[rel_path] = FileData(
                 content=content,
                 size=stat.st_size,
-                mtime=stat.st_mtime_ns,
-                tokens=tokens
+                mtime=stat.st_mtime_ns
                 )
             msgs.append(f"cached '{p}' ({line_info})")
         except Exception as err:
@@ -120,7 +112,7 @@ def _read_files(
 
 @tool
 def read_files(
-    paths: List[str],
+    paths: list[str],
     config: RunnableConfig,
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
@@ -156,7 +148,7 @@ async def write_file(
     Create parent folder if it doesn't exist
     """
     from langchain_core.messages import ToolMessage
-    from vex_shell.engine.helpers import count_tokens
+
 
     cache_on_write = config.get('configurable',{}).get('cache_on_write',False)
 
@@ -185,7 +177,6 @@ async def write_file(
             content=content,
             size=target_stat.st_size,
             mtime=target_stat.st_mtime_ns,
-            tokens=count_tokens(content)
             )}
         return Command(
             update={
@@ -211,11 +202,11 @@ def _insensitive_glob(pattern,**kwargs):
 
 
 def _glob_tool(
-        glob_patterns: List[str]
-        ) -> List[str]:
+        glob_patterns: list[str]
+        ) -> list[str]:
     
     matches: list[str] = []
-    LOGGER.debug(f'glob_tool {str(glob_patterns)}')
+    LOGGER.debug(f'glob_tool {glob_patterns!s}')
     cwd  = Path(file_access_control.cwd).resolve()
     spec = get_gitignore_spec(cwd)
 
@@ -238,7 +229,7 @@ def _glob_tool(
 
                 if safe_path.is_file() and not spec.match_file(rel_path):
                     matches.append(rel_path)
-            except (PermissionError,ValueError) as e:
+            except (PermissionError,ValueError):
                 continue
             except Exception as e:
                 LOGGER.error(e,exc_info=True)
@@ -249,13 +240,13 @@ def _glob_tool(
 
 
 @tool
-def glob_tool(glob_patterns: List[str]) -> str:
+def glob_tool(glob_patterns: list[str]) -> str:
     """
     Glob tool, accept list of wildcard syntax an return list of related filepath as string, one entry per line
     """
     matches: list[str] = _glob_tool(glob_patterns)
     if not matches:
-        return f"No matches found, test other pattern"
+        return "No matches found, test other pattern"
     return "\n".join(list(dict.fromkeys(matches)))
         
 def _tree_tool(root: str = ".") -> str:
@@ -269,7 +260,7 @@ def _tree_tool(root: str = ".") -> str:
         return f"tree_tool: {root} is not dir"
 
     spec = get_gitignore_spec(cwd)
-    valid_rel_paths: List[Path] = []
+    valid_rel_paths: list[Path] = []
 
     for dirpath_str, dirnames, filenames in os.walk(base):
         dirpath = Path(dirpath_str)
@@ -324,12 +315,11 @@ def tree_tool(root: str = ".") -> str:
 def get_tools():
     tools = []
     has_write_access = len(file_access_control.write_patterns) > 0 or file_access_control.all_write
-    
     for _,obj in globals().items():
         if isinstance(obj,BaseTool):
             if obj.name == "write_file" and has_write_access == False:
                 continue
             tools.append(obj)
 
-    LOGGER.info(f"Loaded {len(tools)} tools: {str([t.name for t in tools])}")
+    LOGGER.info(f"Loaded {len(tools)} tools: {[t.name for t in tools]!s}")
     return tools

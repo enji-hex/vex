@@ -1,33 +1,25 @@
-from typing import (
-    List,
-    Literal,
-)
+import io
 import os
-from rich.box import SQUARE
-from rich.console import Console, Group
-from rich.panel import Panel
-from rich.status import Status
-from rich.markdown import Markdown
-from rich.spinner import Spinner
-from rich.live import Live
-from rich.text import Text
-import sys, io,time
-
+import sys
+import time
+from typing import Literal
 
 from langchain_core.messages import (
-    HumanMessage,
-    SystemMessage,
     AnyMessage,
-    AIMessage,
-    ToolMessage,
 )
+from rich.box import SQUARE
+from rich.console import Console, Group
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.spinner import Spinner
+from rich.text import Text
 
-from vex_shell.utils.config import LOGGER
-from vex_shell.utils.fs import sync_cwd_tree
-from vex_cli.commands import cli_command, CliOutput,CliResult
-from vex_shell.engine.events import *
-from vex_shell.engine.agent import Agent
 from vex_cli import prompt
+from vex_cli.commands import CliOutput, cli_command
+from vex_shell.engine.agent import Agent
+from vex_shell.engine.events import *
+from vex_shell.utils.config import LOGGER
 
 if isinstance(sys.stdout, io.TextIOWrapper):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -49,7 +41,9 @@ def wait_for_key():
         while msvcrt.kbhit():
             msvcrt.getch()
     else:
-        import tty, termios, select
+        import select
+        import termios
+        import tty
 
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
@@ -83,6 +77,14 @@ def show_transient_panel(content: str, title: str, console: Console):
         console.show_cursor(True)
         console.file.flush()
 
+def write_msg(text:str,_from:Literal["VEX","SHELL"],console:Console):
+    if _from == 'SHELL':
+        console.print(f"\n[vex.prompt]SHELL > [/vex.prompt] {text}")
+    else:
+        console.print(f"\n[vex.tool]{_from} >[/vex.tool]")
+        console.print(Markdown(text, code_theme="monokai"))
+        console.print()
+        console.rule(style="vex.muted")
 
 async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> str:
     """
@@ -152,16 +154,14 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                 live.update(generate_temp_ui())
 
         if content_str:
-            console.print("\n[vex.tool]VEX >[/vex.tool]")
-            console.print(Markdown(content_str, code_theme="monokai"))
-            console.print()
+            write_msg(content_str,'VEX',console)
 
     return content_str
 
 
 # move to Agent
 async def restore_history(agent, console: Console):
-    messages: List[AnyMessage] = await agent.restore_history()
+    messages: list[AnyMessage] = await agent.restore_history()
     load_last_n = agent.settings.chat["load_last_n"]
 
     LOGGER.info(f"found messages {len(messages)}")
@@ -170,14 +170,12 @@ async def restore_history(agent, console: Console):
         messages = messages[-load_last_n:]
 
     for m in messages:
-        if m.type == "human":
-            console.print(f"\n[vex.prompt]SHELL > [/vex.prompt] {m.content}")
+        if m.type == "human" and isinstance(m.content,str):
+            write_msg(m.content,'SHELL',console)
         if m.type == "ai" and m.content:
             for c in m.content:
                 if isinstance(c, dict) and c["type"] == "text":
-                    console.print("\n[vex.tool]VEX >[/vex.tool]")
-                    console.print(Markdown(c["text"], code_theme="monokai"))
-                    console.print()
+                    write_msg(c["text"],'VEX',console)
 
 async def start_session(
     agent: Agent,
@@ -198,6 +196,8 @@ async def start_session(
         LOGGER.debug(f'console started, elapsed time {elapsed_ms:.2f}ms')
 
     while True:
+        await agent.reconfigure_settings()
+
         user_input = await prompt_session.ask(
             "\n[vex.prompt]SHELL > [/vex.prompt]",
             # pass recorded string in user input if exists

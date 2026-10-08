@@ -6,7 +6,7 @@ vscode:
 
 clean:
 	rm -rf ./build/
-	rm -rf *.egg-info
+	rm -rf ./**/*.egg-info
 	rm -rf ./**/__pycache__
 
 .PHONY: all clean

@@ -1,16 +1,12 @@
-import sys, os
+import os
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict, List, Optional
+
 import prompt_toolkit
-from rich.box import SQUARE
 from rich.console import Console
-from rich.panel import Panel
+
 from vex_shell.engine.agent import Agent
 from vex_shell.engine.state import FileData
-
-from dataclasses import dataclass
-
-
 
 
 class CliOutput(Enum):
@@ -19,7 +15,7 @@ class CliOutput(Enum):
     RENDER  = auto()
 
 @dataclass
-class CliResult():
+class CliResult:
     result: CliOutput
     content: str = ""
     title: str = ""
@@ -27,10 +23,20 @@ class CliResult():
 def _get_state_str(b: bool):
     return "enabled" if b else "disabled"
 
+class VoiceModeError(Exception):
+    def __init__(self,message:str):
+        message = f"\nError details: {message}"
+        super().__init__(
+            "Cannot connect to v2t daemon.\n"
+            "Please make sure 'v2t --daemon' is running in the background.\n\n"
+            "Docs: https://codeberg.org/Enji/v2t"
+            +message
+        )
+
 
 async def voice_mode(console:Console,prompt_session:prompt_toolkit.PromptSession) -> str:
-    import msgspec
     from multiprocessing.connection import Client
+    import msgspec
     
     def send_msgspec(conn,data):
         conn.send_bytes(msgspec.json.encode(data))
@@ -41,17 +47,14 @@ async def voice_mode(console:Console,prompt_session:prompt_toolkit.PromptSession
         addr,family = '/tmp/v2t.sock', 'AF_UNIX'
 
     if not os.path.exists(addr):
-        raise Exception("Cannot connect to v2t daemon.\n"
-                        "Please make sure 'v2t --daemon' is running in the background.\n\n"
-                        "Docs: https://codeberg.org/Enji/v2t",
-                        "v2t Connection Error")
+        raise VoiceModeError(f'file descriptor not exists {addr}')
 
     with Client(addr,family) as conn:
         send_msgspec(conn,{"function":"transcribe_micro","mode":"pipe"})
         resp = msgspec.json.decode(conn.recv_bytes())
     
         if resp.get('msg') != "READY":
-            raise Exception(f"error start recording, {resp.get('err')}")
+            raise VoiceModeError(f"start recording, {resp.get('err')}")
     
         with console.capture() as cap:
             console.print("[vex.prompt]Press Enter to stop recording... [/vex.prompt]",end="")
@@ -73,11 +76,11 @@ async def cli_command(
     console:Console,
     prompt_session:prompt_toolkit.PromptSession
 ) -> CliResult:
-    
     if cmd == "/q":
         return CliResult(CliOutput.EXIT)
     if cmd == "/stat":
         from vex_shell.engine.helpers import count_tokens
+        from vex_shell.utils.file_access import file_access_control
 
         use_mcp = agent.settings.chat["use_mcp"]
         token_usage = agent.token_usage
@@ -92,6 +95,7 @@ async def cli_command(
 
         mcp_state = "enabled" if use_mcp == True else "disabled"
         left_padding = 20
+        env_block = file_access_control.build_environment_context()
         content = (
             f"{'Input:':<{left_padding}}{token_usage.tok_in} | "
             f"Output: {token_usage.tok_out} | "
@@ -99,11 +103,12 @@ async def cli_command(
             f"{'Model:':<{left_padding}}{model_name}\n"
             f"{'MCP:':<{left_padding}}{mcp_state}\n"
             f"{'CWD auto tree:':<{left_padding}}{autosync_cwd_tree}\n"
-            f"{'Cache on Write:':<{left_padding}}{cache_on_write}\n"
+            f"{'Cache on Write:':<{left_padding}}{cache_on_write}\n\n"
+            +env_block+"\n"
         )
 
         state = await agent.get_state()
-        loaded: Dict[str, FileData] = state.values.get("loaded_files", {})
+        loaded: dict[str, FileData] = state.values.get("loaded_files", {})
         cwd_tree = state.values.get("cwd_tree", "")
 
         cached = list(loaded.keys())
@@ -114,7 +119,7 @@ async def cli_command(
         TOK_W = 8
 
         if loaded:
-            file_tokens = sum([v['tokens'] for k, v in loaded.items()])
+            file_tokens   = count_tokens(''.join([v['content'] for k, v in loaded.items()]))
             total_tokens += file_tokens
 
             label = f"Files Context ({len(loaded)} files)"
@@ -150,9 +155,13 @@ async def cli_command(
             "VEX - lean CLI agentic control system\n\n"
             "AVAILABLE COMMANDS:\n"
             "  /q    - Quit session\n"
-            "  /stat - Show token usage\n"
             "  /help - Show help menu\n"
+            "  /stat - Show token usage\n"
+            "  /env  - Show current place of .env file\n"
             "  /cached - Shows all cached files\n"
+            "  /read   - Read files in cache by pattern\n"
+            "  /del    - Delete files from cache by pattern\n"
+            "  /voice -  Voice input mode, works with v2t integration only, check readme for more details\n"
         )
         return CliResult(CliOutput.SKIP,content,"Help")
 
@@ -171,7 +180,7 @@ async def cli_command(
         try:
             text = await voice_mode(console,prompt_session)
             return CliResult(CliOutput.RENDER,text)
-        except Exception as e:
+        except VoiceModeError as e:
             return CliResult(CliOutput.SKIP,str(e))
 
     if cmd.startswith("/read"):

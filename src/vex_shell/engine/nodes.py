@@ -1,22 +1,26 @@
 from __future__ import annotations
+
+import asyncio
 import logging
-from typing import List, TYPE_CHECKING
-import asyncio,os
+import os
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from langchain_core.runnables import RunnableConfig
-    from vex_shell.utils.config import Settings
     from langchain.tools import BaseTool
+    from langchain_core.runnables import RunnableConfig
+
+    from vex_shell.utils.config import Settings
 
 from vex_shell.utils.config import LOGGER
 from vex_shell.utils.file_access import file_access_control
-from vex_shell.utils.fs import sync_loaded_files,sync_cwd_tree
+from vex_shell.utils.fs import sync_cwd_tree, sync_loaded_files
 
-from .state import State
+from .state import FileData, State
+
 
 # LLM NODES
 async def llm_call_node(
-    state: State, config: RunnableConfig, settings: Settings, tools:List[BaseTool]
+    state: State, config: RunnableConfig, settings: Settings, tools:list[BaseTool]
 ):
     """
     Handle errors
@@ -24,21 +28,34 @@ async def llm_call_node(
     - Bad model
     - No tool support
     """
+    from langchain.messages import HumanMessage, SystemMessage
     from langchain_openai import ChatOpenAI
-    from langchain.messages import SystemMessage,HumanMessage
+
     from .helpers import (
-        get_safe_window,
         format_file_context,
+        get_safe_window,
         normalize_tool_calls,
     )
 
     tool_names = [e.name for e in tools]
 
-    llm_cfg       = settings.model
-    current_calls = state.get("llm_calls", 0) + 1
+    llm_cfg     = settings.model
+    max_calls   = max(1, int(llm_cfg.get("max_llm_calls", 3)))
+    calls       = state.get("llm_calls", 0) + 1                                                                                                                      
+    final_call  = calls >= max_calls 
 
     # sync all loaded files — returns FRESH dict with updated content
-    new_files_snap = sync_loaded_files(state.get("loaded_files", {}))
+    old_files = state.get("loaded_files",{})
+    new_files = sync_loaded_files(old_files)
+    loaded_update:dict[str,FileData | None] = {
+        p:d for p,d in new_files.items()
+    }
+    loaded_update.update({
+        p: None
+        for p in old_files.keys() - new_files.keys()
+    })
+
+
     # !! Move to model scope
     cwd_tree       = sync_cwd_tree(state) if settings.chat.get('autosync_cwd_tree',False) else None
     if LOGGER.level == logging.DEBUG:
@@ -48,12 +65,19 @@ async def llm_call_node(
     window: int = llm_cfg.get("context_sliding_window", 10)
     recent = get_safe_window(state["messages"], window)
     
-    system_msg = SystemMessage(content=settings.system_prompt)
+    system_prompt = settings.system_prompt
+    if final_call:
+        system_prompt += (                                                                                                                                     
+            "\nThis is your final response for this user turn. "                                                                                               
+            "Do not call tools. Give the user the best answer you can "                                                                                        
+            "based on the available information."                                                                                                              
+        )
+    system_msg = SystemMessage(content=system_prompt)
 
     # Handle file_context — use FRESH snap, not stale state
     env_block = file_access_control.build_environment_context()
     context_blocks, image_paths = format_file_context(
-        new_files_snap,
+        new_files,
         env_block,
         config.get("configurable", {}).get("use_vision", False),
         cwd_tree=cwd_tree,
@@ -61,13 +85,10 @@ async def llm_call_node(
 
     if image_paths:
         for p in image_paths:
-            new_files_snap.pop(p, None)
+            loaded_update[p] = None
         LOGGER.debug(f"Purged {len(image_paths)} image(s) from loaded_files after injection")
 
-    ephemeral_context_msg = HumanMessage(
-        content=[{"type": "text", "text": "--- ACTIVE FILE CONTEXT (GROUND TRUTH) ---"}]
-        + context_blocks
-    )
+    ephemeral_context_msg = HumanMessage(content=context_blocks)
     payload_messages = [system_msg] + recent + [ephemeral_context_msg]
 
     # reasoning
@@ -75,6 +96,7 @@ async def llm_call_node(
 
     stream_chunk_timeout = llm_cfg.get('ollama',{}).get('stream_chunk_timeout','0')
     llm = ChatOpenAI(
+        openai_proxy=llm_cfg.get("proxy"),
         model=llm_cfg["name"],
         base_url=llm_cfg.get("llm_url", "http://localhost:11434/v1"),
         api_key=os.environ.get("VEX_API_KEY","llama"), # fallback for local model
@@ -87,10 +109,15 @@ async def llm_call_node(
         extra_body=llm_cfg.get("extra_body"),
         reasoning=llm_cfg.get("reasoning")
     )
-    LOGGER.info(f'extra body {llm_cfg.get("extra_body",{})}')
-    llm_with_tools = llm.bind_tools(tools)
+    LOGGER.debug(f'extra body {llm_cfg.get("extra_body",{})}')
+    
+    model = llm if final_call else llm.bind_tools(tools) 
+    resp = await model.ainvoke(payload_messages, config=config)
 
-    resp = await llm_with_tools.ainvoke(payload_messages, config=config)
+    if final_call:
+        resp.tool_calls = []
+    else:
+        resp = normalize_tool_calls(resp,tool_names)
 
     finish_reason = resp.additional_kwargs.get("finish_reason")
     if finish_reason == "length":
@@ -107,57 +134,82 @@ async def llm_call_node(
         )
         return {
             "messages": [resp, warning_msg],
-            "llm_calls": current_calls,
-            "loaded_files": new_files_snap,
+            "llm_calls": calls,
+            "loaded_files": loaded_update,
+            "cwd_tree":cwd_tree,
         }
 
-    resp = normalize_tool_calls(resp, tool_names)
     return {
         "messages": [resp],
-        "llm_calls": current_calls,
-        "loaded_files": new_files_snap,
+        "llm_calls": calls,
+        "loaded_files": loaded_update,
         "cwd_tree":cwd_tree,
     }
 
 
-def should_verify(state: State):
+def should_verify(state: State,settings:Settings):
     from langchain_core.messages import ToolMessage
 
     last_msg = state["messages"][-1]
 
-    if isinstance(last_msg, ToolMessage) and last_msg.name == "write_file":
+    need_verify = (
+        settings.verification.get("check_command") 
+        or settings.verification.get("observe_command")
+    )
+
+    if isinstance(last_msg, ToolMessage) and last_msg.name == "write_file" and need_verify:
         LOGGER.info("should verify , last mesage write")
         return "verification_node"
     return "llm_call"
 
+async def _exec(cmd:str) -> tuple:
+    """Ret code, stdout, stderr"""
+    proc = await asyncio.subprocess.create_subprocess_shell(
+        cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=file_access_control.cwd,
+    )
+    stdout_bytes, stderr_bytes = await proc.communicate()
+    return (
+        proc.returncode,
+        stdout_bytes.decode("utf-8",errors="replace").strip(),
+        stderr_bytes.decode("utf-8",errors="replace").strip()
+    )
+
 
 async def verification_node(state: State, settings: Settings):
     from langchain_core.messages import HumanMessage
-    check_cmd = settings.verification.get("check_command")
+    check_cmd   = settings.verification.get("check_command")
+    observe_cmd = settings.verification.get("observe_command")
 
     if check_cmd:
-        proc = await asyncio.subprocess.create_subprocess_shell(
-            check_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=file_access_control.cwd,
-        )
-        stdout_bytes, stderr_bytes = await proc.communicate()
-        LOGGER.info(f'VERIFY RES {str(stdout_bytes.decode("utf-8"))} \
-                    {str(stderr_bytes.decode("utf-8"))}')
+        retcode,stdout,stderr = await _exec(check_cmd)
+        LOGGER.info(f'VERIFY RES {stdout} {stderr}')
 
-        if proc.returncode != 0:
-            output = (
-                (stderr_bytes or stdout_bytes).decode("utf-8", errors="replace").strip()
-            )
+        if stdout or stderr:
+            return {
+            "messages": [
+                HumanMessage(
+                    content=f"Check result (`{check_cmd}`), return code {retcode}"
+                    f"\n{(stdout or stderr)}"
+                )
+            ]
+        }
+        
+    if observe_cmd:
+        retcode,stdout,stderr = await _exec(observe_cmd)
+        LOGGER.info(f'OBSERVE RES {stdout} {stderr}')
+
+        if stdout or stderr:
             return {
                 "messages": [
                     HumanMessage(
-                        content=f"Build/Check failed (`{check_cmd}`):\n{output}"
+                        content=f"Observer output (`{observe_cmd}`), return code {retcode}"
+                        f"\n{(stdout or stderr)}"
                     )
                 ]
             }
-
     return {}
 
 

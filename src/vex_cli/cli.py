@@ -1,13 +1,15 @@
 from __future__ import annotations
+
 import argparse
-import os,time
 import asyncio
+import os
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from vex_shell.engine.agent import Agent
     from rich.console import Console
+
     from vex_shell.utils.config import Settings
 
 def init_workspace(console: Console, home: bool = False) -> None:
@@ -62,7 +64,6 @@ async def run_agent(args):
     from vex_shell.utils.file_access import file_access_control
 
     settings = config.Settings()
-    file_access_control.reconfigure(settings)
 
     theme_name = settings.chat.get('theme','Fallout-3-Dark-Mode')
     sel_theme,themes = colors.load_theme(theme_name)
@@ -77,7 +78,7 @@ async def run_agent(args):
         init_workspace(console=console)
         return
     if args.list_themes:
-        console.print(f"[vex.success][✓] Available themes[/vex.success]")
+        console.print("[vex.success][✓] Available themes[/vex.success]")
         for id in themes:
             console.print(f"- {id}")
         return
@@ -151,11 +152,12 @@ def cli():
     except (KeyboardInterrupt, asyncio.CancelledError):
         from rich.console import Console
         Console().print("\n[yellow]Session interrupted by user. Shutting down...[/yellow]")
-    except Exception as e:
+    
+    except Exception as e: # !ignore
         from rich.console import Console
         Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
-
-        import traceback;traceback.print_exc()
+        import traceback
+        # traceback.print_exc()
     
 
 if __name__ == "__main__":

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import uuid
-from typing import Any, Dict, List,TYPE_CHECKING, Tuple
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
 from vex_shell.utils.config import LOGGER
 
 if TYPE_CHECKING:
-    from langchain_core.messages import HumanMessage,AIMessage,ToolMessage
-    from .state import State, FileData
+    from langchain_core.messages import AIMessage
+
+    from .state import FileData
 
 async def get_saved_sessions(db_path:str|Path) -> list[str]:
     import aiosqlite
@@ -21,6 +23,8 @@ async def get_saved_sessions(db_path:str|Path) -> list[str]:
             return [row[0] for row in rows]
 
 def get_safe_window(messages:list, target_window:int) -> list:
+    """ target_window = -1, disable target window"""
+    
     from langchain_core.messages import HumanMessage, ToolMessage
 
     if target_window != -1 and len(messages) > target_window:
@@ -49,11 +53,11 @@ def get_safe_window(messages:list, target_window:int) -> list:
     return pruned
 
 def format_file_context(
-        loaded_files: Dict[str, FileData],
+        loaded_files: dict[str, FileData],
         env_block: str,
         use_vision: bool,
         cwd_tree: str | None = None,
-    ) -> Tuple[List[Dict[str,Any]],List[str]]:
+    ) -> tuple[list[dict[str,Any]],list]:
     """
     Build context blocks from the *already-synced* loaded_files dict.
     Returns (content_blocks, image_paths) where image_paths is a list of
@@ -66,7 +70,6 @@ def format_file_context(
     header_text = (
         f"{env_block}\n"
         f"--- ACTIVE WORKING CONTEXT (GROUND TRUTH) ---\n"
-        f"### Active Working Context (Latest File Versions)\n"
     )
     content_blocks.append({"type":"text","text":header_text})
 
@@ -102,7 +105,7 @@ def format_file_context(
     return content_blocks, image_paths
 
 
-def normalize_tool_calls(msg:AIMessage,tool_names:List[str]) -> AIMessage:
+def normalize_tool_calls(msg:AIMessage,tool_names:list[str]) -> AIMessage:
     from langchain_core.messages import ToolCall
 
     if msg.tool_calls: return msg
@@ -115,7 +118,7 @@ def normalize_tool_calls(msg:AIMessage,tool_names:List[str]) -> AIMessage:
             d, pos = dec.raw_decode(text,idx=pos)
             if isinstance(d,dict) and (name  := d.get("name")) in tool_names:
                 args = d.get("arguments") or d.get("args") or {}
-                LOGGER.info(f'fallback tool call {name} {str(args)}')
+                LOGGER.info(f'fallback tool call {name} {args!s}')
                 calls.append(ToolCall(name=name,args=args,id=f'call_{uuid.uuid4().hex[:8]}'))
         except json.JSONDecodeError:
             pos += 1

@@ -1,19 +1,15 @@
-from logging import Logger, FileHandler
-from pathlib import Path
-from typing import Any, Dict, List
 import logging
 import os
 import tomllib
+from logging import FileHandler, Logger
+from pathlib import Path
+from typing import Any
+
 import dotenv
 
-LOGGER = Logger("VEX-SHELL-DEBUG")
+from vex_shell.utils.file_access import file_access_control
 
-def reconfigure_logger(path:str,log_level:str):
-    global LOGGER
-    LOGGER.setLevel(
-        logging.getLevelNamesMapping().get(log_level.upper(),logging.INFO)
-    )
-    LOGGER.addHandler(FileHandler(path, "w", "utf-8"))
+LOGGER = Logger("VEX-SHELL-DEBUG")
 
 class Settings:
     def __init__(self) -> None:
@@ -21,8 +17,10 @@ class Settings:
             Path.cwd()  / ".vex",
             Path.home() / ".vex",
         ]
-        cfg = None
-        self.vex_folder = "" # always initialized
+        
+        self.cfg_file_ac_time       = 0
+        self.system_prompt_ac_time  = 0
+        self.vex_folder:Path | None = None
 
         # separate loading env
         # search ENV in CWD/.vex -> HOME/.vex
@@ -38,39 +36,80 @@ class Settings:
         for p in candidates:
             cfg_file =  p / "CONFIG.toml"
             if cfg_file.is_file():
-                cfg =  tomllib.loads(cfg_file.read_text(encoding='utf-8'))
-                provider = cfg.get("model",{}).get("VEX_API_KEY")
                 self.vex_folder = p
-                if os.getenv("VEX_API_KEY") or provider == "ollama":
-                    break
+                break
 
-        if not cfg:
-            raise Exception("CONFIG not found in .vex folder")
+        if not self.vex_folder:
+            raise Exception(".vex folder not found")
         if not os.getenv("VEX_API_KEY"):
             raise Exception("VEX_API_KEY not found in env")
         
-        # test
-        self.verification = cfg.get('verification',{})
+        self._configure()
+        self.reconfigure_logger() # configure once
+    
+    def reconfigure_logger(self):
+        global LOGGER
+        LOGGER.setLevel(
+            logging.getLevelNamesMapping()
+                .get(self.cfg.get('logging_level','info').upper(),logging.INFO)
+        )
+        LOGGER.addHandler(FileHandler(f"{self.vex_folder}/vex.log", "w", "utf-8"))
+
+    def _configure(self):
+        """
+        Read and load config file, 
+        - set all internal fields,
+        - reload settings      if modified
+        - reload system prompt if modified
+        """
+
+        if self.vex_folder is None:
+            raise Exception("vex_folder is not initialized")
+
+        cfg_path = (self.vex_folder / "CONFIG.toml")        
+        mtime = cfg_path.stat().st_mtime_ns
+
+        # Update config only if it stale
+        if mtime != self.cfg_file_ac_time:
+            self.cfg_file_ac_time = mtime # update cfg mtime
+
+            cfg =  tomllib.loads(cfg_path.read_text(encoding='utf-8'))
+            self.cfg = cfg # raw config
+
+            # separate settings
+            self.verification = cfg.get('verification',{})
+            self.model: dict[str, Any] = cfg["model"]
+            self.chat: dict[str, Any] = cfg["chat"]
+            self.permissions: dict[str, list[str]] = cfg["permissions"]
+            self.config_path = cfg_path.as_posix()
+            self.db_path = (Path(self.vex_folder) / "session.db").as_posix()
+
+            LOGGER.debug('CONFIG reloaded, modified')
+            file_access_control.reconfigure(self)
         
-        self.model: Dict[str, Any] = cfg["model"]
-        self.chat: Dict[str, Any] = cfg["chat"]
-        self.permissions: Dict[str, List[str]] = cfg["permissions"]
-        self.config_path = p.as_posix()
-        self.db_path = (Path(p) / "session.db").as_posix()
-
-        reconfigure_logger(f"{self.config_path}/vex.log",cfg.get('logging_level',''))
-
+        # re-load system prompt on the fly
         self.system_prompt = self._get_system_prompt()
-        LOGGER.info(f'system prompt loaded from {self.config_path}')
 
+        
     def _get_system_prompt(self):
+        # Location loaded once
+
         candidates = [
-            Path.cwd() / ".vex" / "AGENTS.md",
-            Path.cwd() /  "AGENTS.md", # keep as fallback for lazy devs
+            Path.cwd()  / ".vex" / "AGENTS.md",
+            Path.cwd()  /  "AGENTS.md", # keep as fallback for lazy devs
             Path.home() / ".vex" / "AGENTS.md"
         ]
-        for p in candidates:
-            if p.is_file():
-                return p.read_text(encoding='utf-8')
-        return ""
+        path = next((p for p in candidates if p.is_file()),None)
+        if path is None:
+            raise ValueError(f"System prompt not found in vex_folder {self.vex_folder}")
+        
+        mtime = path.stat().st_mtime_ns
+        if mtime != self.system_prompt_ac_time:
+            self.system_prompt_ac_time = mtime
+            LOGGER.debug('SYSTEM prompt reloaded, modified')
+            return path.read_text(encoding='utf-8')
+        
+        return self.system_prompt
+    
+
         
