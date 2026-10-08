@@ -12,8 +12,7 @@
   ╚═══╝  ╚══════╝╚═╝  ╚═╝
 </pre>
 
-VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*) that keeps your workspace in sync while you interact with large 
-language models. It combines LangChain, LangGraph, and OpenRouter(or ollama) to give you a fast, secure, and extensible development assistant.
+VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*) that keeps your workspace continuously in sync with your LLM session using Active Working Context.
 
 ## Core Highlights
 - **State‑graph agent** - Powered by async SQLite checkpointing; sessions survive crashes and can be resumed anytime.
@@ -37,10 +36,10 @@ uv tool install "git+https://codeberg.org/Enji/vex.git"
 # Initialize global config folder ~/.vex
 vex
 
-# Initialise a local workspace in the current directory
+# Initialize a local workspace in the current directory
 vex --init
 
-# Set your API key (required for OpenRouter,nanoGPT or other providers)
+# Set your API key (required for OpenRouter, nanoGPT or other providers)
 #   Global: edit ~/.vex/.env
 #   Local : edit .vex/.env
 # Example content:
