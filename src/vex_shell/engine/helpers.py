@@ -4,12 +4,10 @@ import json
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
 from vex_shell.utils.config import LOGGER
 
 if TYPE_CHECKING:
     from langchain_core.messages import AIMessage
-
     from .state import FileData
 
 async def get_saved_sessions(db_path:str|Path) -> list[str]:

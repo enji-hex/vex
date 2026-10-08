@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rich.console import Console
-
     from vex_shell.utils.config import Settings
 
 def init_workspace(console: Console, home: bool = False) -> None:
@@ -90,27 +89,10 @@ async def run_agent(args):
     from vex_shell.engine import core
     from vex_shell.engine.agent import Agent
 
-    # timings check
-    # ---------------------
-    t0 = time.perf_counter_ns()
-
     tools,mcp_manager = await core.get_tools(settings)
-    t_tools = time.perf_counter_ns()
-
     graph = core.build_graph(settings, tools)
-    t_graph = time.perf_counter_ns()
-
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
-    t_agent = time.perf_counter_ns()
 
-    config.LOGGER.debug(
-        "Startup breakdown:\n"
-        f"- Tools & MCP:  {(t_tools - t0) / 1e6:.1f}ms\n"
-        f"- Graph Build:  {(t_graph - t_tools) / 1e6:.1f}ms\n"
-        f"- Agent Init:   {(t_agent - t_graph) / 1e6:.1f}ms\n"
-        f"- Total Core:   {(t_agent - t0) / 1e6:.1f}ms"
-    )
-    # ---------------------
     try:
         from vex_cli.console import start_session
         await start_session(agent, console)
@@ -127,18 +109,10 @@ def cli():
             "If the current directory has no .vex folder, a user‑wide one is created."
         )
     )
-    parser.add_argument(
-        "--init", "-i", action="store_true", help="Initialize .vex project"
-    )
-    parser.add_argument(
-        "--session", "-s", default="default", help="Initialize .vex project"
-    )
-    parser.add_argument(
-        "--list-themes", "-lt",action="store_true", help="List available color schemes"
-    )
-    parser.add_argument(
-        "--list-sessions", "-ls", action="store_true", help="List saved sessions"
-    )
+    parser.add_argument("--init", "-i", action="store_true", help="Initialize .vex project")
+    parser.add_argument("--session", "-s", default="default", help="Initialize .vex project")
+    parser.add_argument("--list-themes", "-lt",action="store_true", help="List available color schemes")
+    parser.add_argument("--list-sessions", "-ls", action="store_true", help="List saved sessions")
     parser.add_argument("--reset", action="store_true", help="reset sqlite database")
     parser.add_argument(
         "--reset-global",
@@ -153,11 +127,9 @@ def cli():
         from rich.console import Console
         Console().print("\n[yellow]Session interrupted by user. Shutting down...[/yellow]")
     
-    except Exception as e: # !ignore
+    except Exception as e:
         from rich.console import Console
         Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
-        import traceback
-        # traceback.print_exc()
     
 
 if __name__ == "__main__":

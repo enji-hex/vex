@@ -5,10 +5,8 @@ from collections.abc import AsyncIterator
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
-
 import aiosqlite
 from langchain_core._api.beta_decorator import LangChainBetaWarning
-
 from vex_shell.engine.events import *
 from vex_shell.utils.config import LOGGER, Settings
 from vex_shell.utils.file_access import file_access_control
@@ -22,14 +20,6 @@ if TYPE_CHECKING:
 
     from vex_shell.mcp_tools.tools_mcp import MCPManager
     from vex_shell.tools.tools import _glob_tool, _read_files
-
-def _glob_tool(*args,**kwargs):
-    from vex_shell.tools.tools import _glob_tool as real_fn
-    return real_fn(*args,**kwargs)
-
-def _read_files(*args,**kwargs):
-    from vex_shell.tools.tools import _read_files as real_fn
-    return real_fn(*args,**kwargs)
 
 async def process(stream) -> AsyncIterator[AgentEvent]:
     async for event in stream:
@@ -142,6 +132,8 @@ class Agent:
         return await self.graph.aget_state(self.config)
 
     async def read_files(self,pattern:str) -> list[str]:
+        from vex_shell.tools.tools import _glob_tool,_read_files
+
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
 
@@ -162,6 +154,8 @@ class Agent:
         return msgs
     
     async def purge_files(self,pattern:str) -> list[str]:
+        from vex_shell.tools.tools import _glob_tool
+
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
         cwd = Path(file_access_control.cwd)

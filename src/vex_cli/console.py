@@ -1,12 +1,6 @@
-import io
-import os
-import sys
-import time
+import io,os,sys,time
 from typing import Literal
 
-from langchain_core.messages import (
-    AnyMessage,
-)
 from rich.box import SQUARE
 from rich.console import Console, Group
 from rich.live import Live
@@ -161,7 +155,7 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
 
 # move to Agent
 async def restore_history(agent, console: Console):
-    messages: list[AnyMessage] = await agent.restore_history()
+    messages = await agent.restore_history()
     load_last_n = agent.settings.chat["load_last_n"]
 
     LOGGER.info(f"found messages {len(messages)}")

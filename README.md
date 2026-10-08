@@ -97,8 +97,9 @@ Full agent functionality out of the box!!
 
 ## Security Note
 
+> [!IMPORTANT] 
 > File-access permissions apply to VEX’s built-in file tools only. They do not restrict MCP tools or commands configured under check_command and observe_command. \
->  These commands execute in the working directory; configure only trusted MCP servers and commands.
+> These commands execute in the working directory; configure only trusted MCP servers and commands.
 
 ## Example Workflow
 1. `read_files path/to/module.py` – caches the file in the active context.
@@ -141,9 +142,9 @@ Full agent functionality out of the box!!
 ```
 ---------------------
 Module    LOC
-VEX_SHELL 1221
-VEX_CLI   545
-TOTAL     1766
+VEX_SHELL 1200
+VEX_CLI   519
+TOTAL     1719
 ---------------------
 ```
 - **Start time:** ~2.12s

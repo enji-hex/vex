@@ -2,11 +2,8 @@ import csv
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
-
 from rich.theme import Theme
-
 from vex_shell.utils.config import LOGGER
-
 
 @dataclass
 class Palette:

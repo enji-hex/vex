@@ -1,10 +1,8 @@
 import os
 from dataclasses import dataclass
 from enum import Enum, auto
-
 import prompt_toolkit
 from rich.console import Console
-
 from vex_shell.engine.agent import Agent
 from vex_shell.engine.state import FileData
 

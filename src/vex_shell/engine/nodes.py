@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 from typing import TYPE_CHECKING
 
@@ -58,8 +57,7 @@ async def llm_call_node(
 
     # !! Move to model scope
     cwd_tree       = sync_cwd_tree(state) if settings.chat.get('autosync_cwd_tree',False) else None
-    if LOGGER.level == logging.DEBUG:
-        LOGGER.debug(f'CWD tree: {cwd_tree}')
+    LOGGER.debug(f'CWD tree: {cwd_tree}')
 
     # handle sliding window
     window: int = llm_cfg.get("context_sliding_window", 10)
@@ -119,28 +117,23 @@ async def llm_call_node(
     else:
         resp = normalize_tool_calls(resp,tool_names)
 
+    messages = [resp]
+
+    # may be incorrect
     finish_reason = resp.additional_kwargs.get("finish_reason")
     if finish_reason == "length":
         LOGGER.warning(
             f'response was truncated by token limit {settings.model.get("max_completion_tokens")}, fallback'
         )
-
-        # Prevent tool calls ,force tool_calls to be empty so 'should_continue'
-        # returns END instead of 'tool_node'
         resp.tool_calls = []
         warning_msg = SystemMessage(
             content="[SYSTEM: Your previous response was truncated due to token limits. "
             "Please continue exactly where you left off in your next response.]"
         )
-        return {
-            "messages": [resp, warning_msg],
-            "llm_calls": calls,
-            "loaded_files": loaded_update,
-            "cwd_tree":cwd_tree,
-        }
-
+        messages = [resp,warning_msg]
+        
     return {
-        "messages": [resp],
+        "messages": messages,
         "llm_calls": calls,
         "loaded_files": loaded_update,
         "cwd_tree":cwd_tree,
@@ -183,40 +176,25 @@ async def verification_node(state: State, settings: Settings):
     check_cmd   = settings.verification.get("check_command")
     observe_cmd = settings.verification.get("observe_command")
 
+    content = ""
     if check_cmd:
         retcode,stdout,stderr = await _exec(check_cmd)
         LOGGER.info(f'VERIFY RES {stdout} {stderr}')
-
-        if stdout or stderr:
-            return {
-            "messages": [
-                HumanMessage(
-                    content=f"Check result (`{check_cmd}`), return code {retcode}"
-                    f"\n{(stdout or stderr)}"
-                )
-            ]
-        }
+        content +=f"Check result (`{check_cmd}`), return code {retcode}\n{(stdout or stderr)}\n"
         
     if observe_cmd:
         retcode,stdout,stderr = await _exec(observe_cmd)
         LOGGER.info(f'OBSERVE RES {stdout} {stderr}')
-
-        if stdout or stderr:
-            return {
-                "messages": [
-                    HumanMessage(
-                        content=f"Observer output (`{observe_cmd}`), return code {retcode}"
-                        f"\n{(stdout or stderr)}"
-                    )
-                ]
-            }
-    return {}
+        content += f"Observer output (`{observe_cmd}`), return code {retcode}\n{(stdout or stderr)}\n"
+            
+    return {
+        "messages": [HumanMessage(content=content)]
+    }
 
 
 def should_continue(state: State):
     END = "__end__"
     from langchain_core.messages import AIMessage
-    # from langgraph.graph.state import END,START
 
     messages = state.get("messages",[])
     if not messages:

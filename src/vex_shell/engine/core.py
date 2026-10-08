@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from vex_shell.utils.config import Settings
 
     
-
 async def get_tools(settings:Settings) -> tuple[list[BaseTool], MCPManager | None]:
     from ..tools.tools import get_tools
     tools = get_tools()
