@@ -1,9 +1,7 @@
 # VEX SHELL
 
-<style>
-    a{color:orange}
-</style>
-<pre style="color:orange;background-color:transparent">
+
+<pre >
 ██╗   ██╗███████╗██╗  ██╗
 ██║   ██║██╔════╝╚██╗██╔╝
 ██║   ██║█████╗   ╚███╔╝ 
