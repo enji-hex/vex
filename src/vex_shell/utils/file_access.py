@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import pathspec
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -94,7 +95,8 @@ class FileAccessControl:
                 prefix = pattern[:-3]
                 return rel_path == prefix or rel_str.startswith(f"{prefix}/")
             
-            return rel_path.match(pattern)
+            return pathspec.PathSpec.from_lines("gitwildmatch",
+                [pattern]).match_file(rel_str)
         except ValueError:
             is_abs_pattern = pattern.startswith("/") or (
                 len(pattern) > 1 and pattern[1] == ":"

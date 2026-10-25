@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import warnings
 from collections.abc import AsyncIterator
 from fnmatch import fnmatch
@@ -109,6 +110,7 @@ class Agent:
         mcp_manager:MCPManager | None = None
     ) -> Self:
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+        from vex_shell.tools.tools import _tree_tool
 
         conn = await aiosqlite.connect(settings.db_path)
         checkpointer = AsyncSqliteSaver(conn)
@@ -117,6 +119,8 @@ class Agent:
 
         agent =  cls(compiled_graph,session_id,settings,conn,mcp_manager)
         await agent.restore_token_usage()
+        if LOGGER.level == logging.DEBUG:
+            LOGGER.debug(_tree_tool())
         return agent
 
 
@@ -138,7 +142,7 @@ class Agent:
         state_values = current_state.values if current_state else {}
 
         files = _glob_tool([pattern])
-        LOGGER.info(f'glob found {files!s} files')
+        LOGGER.debug(f'glob found {files!s} files')
         
         loaded,msgs = _read_files(files,self.config,state_values)
         update_payload:dict = {"loaded_files":loaded}
@@ -150,7 +154,7 @@ class Agent:
             self.config,
             update_payload,
             as_node="llm_call")
-        LOGGER.info(f'manual caching, cached total {len(loaded)} files')
+        LOGGER.debug(f'manual caching, cached total {len(loaded)} files')
         return msgs
     
     async def purge_files(self,pattern:str) -> list[str]:

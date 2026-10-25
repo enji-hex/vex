@@ -46,7 +46,7 @@ max_retries = 3
 # empty patterns, no access at all
 
 patterns = [
-    "r */**",
+    "r ./**",
 ]
 
 

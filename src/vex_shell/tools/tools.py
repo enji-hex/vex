@@ -235,7 +235,7 @@ def _glob_tool(
                 LOGGER.error(e,exc_info=True)
 
     uniqueq_mathes = list(dict.fromkeys(matches))
-    LOGGER.info(f'glob found {len(uniqueq_mathes)} files')
+    LOGGER.debug(f'glob found {uniqueq_mathes} files')
     return uniqueq_mathes
 
 
@@ -251,58 +251,25 @@ def glob_tool(glob_patterns: list[str]) -> str:
         
 def _tree_tool(root: str = ".") -> str:
     """Return an indented tree view of *root* showing permission-validated files."""
-    cwd = Path(file_access_control.cwd)
-    base = (
-        cwd / root if not Path(root).is_absolute() else Path(root)
-    ).resolve()
+    cwd = Path(file_access_control.cwd).resolve()
+    pattern = (str(Path(root) / "**"))
+    matches = _glob_tool([pattern])
+    if not matches:
+        return f"tree_tool: no accessible files match {root}"  
 
-    if not base.is_dir():
-        return f"tree_tool: {root} is not dir"
-
-    spec = get_gitignore_spec(cwd)
-    valid_rel_paths: list[Path] = []
-
-    for dirpath_str, dirnames, filenames in os.walk(base):
-        dirpath = Path(dirpath_str)
-        
-        # Filter fiels with .gitignore
-        dirnames[:] = sorted(
-            d
-            for d in dirnames
-            if not spec.match_file(get_rel_str(dirpath / d, cwd) + "/")
-        )
-
-        for f in sorted(filenames):
-            file_path = dirpath / f
-            rel_str = get_rel_str(file_path, cwd)
-
-            if spec.match_file(rel_str):
-                continue
-            try:
-                file_access_control.validate_read(str(file_path))
-                valid_rel_paths.append(file_path.relative_to(base))
-            except PermissionError:
-                pass
-
-    if not valid_rel_paths:
-        return f"{base.name}/ (no accessible files)"
-
+    rel_paths = sorted(Path(p) for p in matches) 
     printed_dirs: set[Path] = set()
-    lines = [f"{base.name}/"]
+    lines = [f"{cwd.name}/"]
 
-    for rel_file in sorted(valid_rel_paths):
+    for rel_file in rel_paths:
         ancestors = [p for p in reversed(rel_file.parents) if p != Path(".")]
 
         for parent in ancestors:
             if parent not in printed_dirs:
-                depth = len(parent.parts)
-                indent = "  " * depth  # 2 spaces per level
-                lines.append(f"{indent}{parent.name}/")
+                lines.append(f"{'  ' * len(parent.parts)}{parent.name}/")
                 printed_dirs.add(parent)
 
-        depth = len(rel_file.parts)
-        indent = "  " * depth
-        lines.append(f"{indent}{rel_file.name}")
+        lines.append(f"{'  ' * len(rel_file.parts)}{rel_file.name}")
 
     return "\n".join(lines)
 
@@ -310,7 +277,9 @@ def _tree_tool(root: str = ".") -> str:
 @tool
 def tree_tool(root: str = ".") -> str:
     """Return an indented tree view of *root* showing permission-validated files."""
-    return _tree_tool(root)
+    res =  _tree_tool(root)
+    LOGGER.debug(res)
+    return res
 
 def get_tools():
     tools = []
