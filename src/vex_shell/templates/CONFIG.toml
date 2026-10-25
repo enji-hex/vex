@@ -25,7 +25,8 @@ observe_command = ""
 # used ChatOpenAI
 llm_url = "https://nano-gpt.com/api/v1"
 # proxy="socks5://127.0.0.1:20170"
-max_llm_calls = 3
+
+max_llm_calls = 3 # 3 default, -1 disable
 
 use_vision = false # optional,image read support
 name = "openai/gpt-6-luna-pro"
@@ -56,11 +57,3 @@ stream_chunk_timeout=0
 
 [model.extra_body] # optional
 repetition_penalty = 1.2
-
-# https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
-# [model.reasoning]
-# effort = "high"
-
-
-# [model.extra_body.provider]
-# data_collection = "deny"

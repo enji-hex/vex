@@ -39,9 +39,13 @@ async def llm_call_node(
     tool_names = [e.name for e in tools]
 
     llm_cfg     = settings.model
-    max_calls   = max(1, int(llm_cfg.get("max_llm_calls", 3)))
-    calls       = state.get("llm_calls", 0) + 1                                                                                                                      
-    final_call  = calls >= max_calls 
+    max_llm_calls = int(llm_cfg.get("max_llm_calls", 3))
+    if max_llm_calls == -1:
+        final_call = False
+    else:
+        calls       = state.get("llm_calls", 0) + 1                                                                                                                      
+        final_call  = calls >= max_llm_calls
+    
 
     # sync all loaded files — returns FRESH dict with updated content
     old_files = state.get("loaded_files",{})
