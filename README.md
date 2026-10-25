@@ -140,9 +140,9 @@ Full agent functionality out of the box!!
 ```
 ---------------------
 Module    LOC
-VEX_SHELL 1200
+VEX_SHELL 1183
 VEX_CLI   519
-TOTAL     1719
+TOTAL     1702
 ---------------------
 ```
 - **Start time:** ~2.12s
