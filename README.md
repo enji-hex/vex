@@ -134,7 +134,7 @@ Full agent functionality out of the box!!
 | `/q` | Quit the current VEX session. |
 
 
-## **Metrics (8.10.2026)**
+## **Metrics (25.10.2026)**
 
 - **Footprint**
 ```
