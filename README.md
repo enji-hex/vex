@@ -110,7 +110,7 @@ Full agent functionality out of the box!!
 - **UI Themes**: Define custom terminal color schemes inside src/vex_cli/colors.py.
 
 ## CLI Flags
-
+ 
 | Flag | Description |
 |------|-------------|
 | `-i`, `--init` | Initialise a new `.vex` workspace (creates folder and template files). |
