@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import logging
 import warnings
 from collections.abc import AsyncIterator
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
+
 import aiosqlite
 from langchain_core._api.beta_decorator import LangChainBetaWarning
+
 from vex_shell.engine.events import *
 from vex_shell.utils.config import LOGGER, Settings
 from vex_shell.utils.file_access import file_access_control
@@ -20,7 +21,6 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph, StateGraph
 
     from vex_shell.mcp_tools.tools_mcp import MCPManager
-    from vex_shell.tools.tools import _glob_tool, _read_files
 
 async def process(stream) -> AsyncIterator[AgentEvent]:
     async for event in stream:
@@ -29,7 +29,7 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
         data = params.get("data", {})
 
         if method == "tools":
-            LOGGER.debug(f"tools: {method} {data}")
+            # LOGGER.debug(f"tools: {method} {data}")
 
             event_type = data.get("event")
             if event_type == "tool-started":
@@ -53,21 +53,17 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
             else:
                 continue
 
-            LOGGER.debug(f'messages {msg_data}')
+            # LOGGER.debug(f'messages {msg_data}')
 
             if not isinstance(msg_data, dict) or not isinstance(graph_meta, dict):
                 continue
             event_type = msg_data.get("event")
 
-            # message
-            block = msg_data.get("fields") or msg_data.get("delta") or {}
-            delta_type = block.get("type")
-
-            if delta_type == "text-delta":
-                text = block.get("text", "")
+            if event_type == "content-block-finish":
+                text = msg_data.get("content",{}).get("text")
                 if text:
-                    yield TextDelta(text)
-            
+                    yield TextFinish(text)
+
             if event_type == "message-finish" and "usage" in msg_data:
                 usage = msg_data["usage"]
                 yield TokenUsage(
@@ -109,6 +105,7 @@ class Agent:
         mcp_manager:MCPManager | None = None
     ) -> Self:
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
         from vex_shell.tools.tools import _tree_tool
 
         conn = await aiosqlite.connect(settings.db_path)
@@ -135,7 +132,7 @@ class Agent:
         return await self.graph.aget_state(self.config)
 
     async def read_files(self,pattern:str) -> list[str]:
-        from vex_shell.tools.tools import _glob_tool,_read_files
+        from vex_shell.tools.tools import _glob_tool, _read_files
 
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}

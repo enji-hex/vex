@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
-import pathspec
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
+
+import pathspec
 
 if TYPE_CHECKING:
     from .config import Settings
@@ -69,7 +70,7 @@ class FileAccessControl:
     def _strip_rel(self, lst: list[str]) -> list[str]:
         res = []
         for l in lst:
-            cleaned = l[2:] if l.startswith('./') or l.startswith('.\\') else l
+            cleaned = l[2:] if l.startswith(('./','.\\')) else l
 
             if cleaned in ("", ".", "/", "\\"):
                 raise ValueError(

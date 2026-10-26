@@ -141,14 +141,9 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                 current_status = "VEX is thinking..."
                 live.update(generate_temp_ui())
             
-            elif isinstance(ev, TextDelta):
+            elif isinstance(ev,TextFinish):
                 content_str += ev.text
-                current_status = "[vex.prompt]Generating response...[/vex.prompt]"
-
-                live.update(generate_temp_ui())
-
-        if content_str:
-            write_msg(content_str,'VEX',console)
+                write_msg(ev.text,'VEX',console)
 
     return content_str
 

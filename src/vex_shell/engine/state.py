@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import Annotated, TypedDict,TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Annotated, TypedDict
+
 from langgraph.graph.message import add_messages
 
 if TYPE_CHECKING:

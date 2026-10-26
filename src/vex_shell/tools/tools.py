@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import glob
 import io
-import os
 from pathlib import Path
 from typing import Annotated
 
@@ -217,7 +216,7 @@ def _glob_tool(
             include_hidden=False,
         )
 
-        LOGGER.debug(f"glob_tool '{g}' {str(founded_path)}")
+        LOGGER.debug(f"glob_tool '{g}' {founded_path!s}")
         for path_str in founded_path:
             full_path = Path(path_str) if is_abs else cwd / path_str
             
@@ -229,8 +228,8 @@ def _glob_tool(
                     matches.append(rel_path)
             except (PermissionError,ValueError):
                 continue
-            except Exception as e:
-                LOGGER.error(e,exc_info=True)
+            except Exception:
+                LOGGER.error("glob_tool undefined exception ",exc_info=True)
 
     uniqueq_mathes = list(dict.fromkeys(matches))
     return uniqueq_mathes
@@ -299,7 +298,7 @@ def tree_tool(root: str = ".") -> str:
 def get_tools():
     tools = []
     has_write_access = len(file_access_control.write_patterns) > 0 or file_access_control.all_write
-    for _,obj in globals().items():
+    for obj in globals().values():
         if isinstance(obj,BaseTool):
             if obj.name == "write_file" and has_write_access == False:
                 continue

@@ -78,8 +78,8 @@ async def main():
     stream = agent.run_step("read ./main.py and print here")
     print(f'used key from {agent.settings.env_path}')
     async for ev in stream:
-        if isinstance(ev,events.TextDelta):
-            print(ev.text,end='',flush=True)
+        if isinstance(ev,events.TextFinish): # prints ready message
+            print(ev.text)
         elif isinstance(ev,events.ToolStart):
             print(f'[start tool: {ev.tool_name} ]',end='',flush=True)
     

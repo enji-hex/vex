@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 from vex_shell.engine.state import FileData, State
 

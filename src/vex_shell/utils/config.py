@@ -1,7 +1,7 @@
 import logging
 import os
 import tomllib
-from logging import FileHandler, Logger
+from logging import FileHandler
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +9,7 @@ import dotenv
 
 from vex_shell.utils.file_access import file_access_control
 
-LOGGER = Logger("VEX-SHELL-DEBUG")
+LOGGER = logging.getLogger("VEX-SHELL-DEBUG")
 
 class Settings:
     def __init__(self) -> None:
@@ -48,7 +48,6 @@ class Settings:
         self.reconfigure_logger() # configure once
     
     def reconfigure_logger(self):
-        global LOGGER
         LOGGER.setLevel(
             logging.getLevelNamesMapping()
                 .get(self.cfg.get('logging_level','info').upper(),logging.INFO)
