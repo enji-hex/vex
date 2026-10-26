@@ -13,7 +13,7 @@ load_last_n =  10
 keep_tool_logs =  false
 
 custom_cwd = ""             # optional
-autosync_cwd_tree = true
+autosync_cwd_tree = false   # Automatically attach current working directory tree(with only permitted files) to agent context
 cache_on_write    = false   # Auto read each file written by LLM
 theme = "Land-of-Ooo"
 

@@ -59,7 +59,6 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
                 continue
             event_type = msg_data.get("event")
 
-
             # message
             block = msg_data.get("fields") or msg_data.get("delta") or {}
             delta_type = block.get("type")
@@ -119,7 +118,7 @@ class Agent:
 
         agent =  cls(compiled_graph,session_id,settings,conn,mcp_manager)
         await agent.restore_token_usage()
-        if LOGGER.level == logging.DEBUG:
+        if agent.settings.chat.get('autosync_cwd_tree',False):
             LOGGER.debug(_tree_tool())
         return agent
 

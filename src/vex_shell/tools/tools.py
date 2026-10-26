@@ -134,7 +134,6 @@ def read_files(
         }
     )
 
-
 @tool
 async def write_file(
     path: str,
@@ -206,7 +205,6 @@ def _glob_tool(
         ) -> list[str]:
     
     matches: list[str] = []
-    LOGGER.debug(f'glob_tool {glob_patterns!s}')
     cwd  = Path(file_access_control.cwd).resolve()
     spec = get_gitignore_spec(cwd)
 
@@ -219,7 +217,7 @@ def _glob_tool(
             include_hidden=False,
         )
 
-        LOGGER.debug('patterns '+str(founded_path))
+        LOGGER.debug(f"glob_tool '{g}' {str(founded_path)}")
         for path_str in founded_path:
             full_path = Path(path_str) if is_abs else cwd / path_str
             
@@ -235,7 +233,6 @@ def _glob_tool(
                 LOGGER.error(e,exc_info=True)
 
     uniqueq_mathes = list(dict.fromkeys(matches))
-    LOGGER.debug(f'glob found {uniqueq_mathes} files')
     return uniqueq_mathes
 
 
@@ -248,25 +245,43 @@ def glob_tool(glob_patterns: list[str]) -> str:
     if not matches:
         return "No matches found, test other pattern"
     return "\n".join(list(dict.fromkeys(matches)))
-        
+
 def _tree_tool(root: str = ".") -> str:
-    """Return an indented tree view of *root* showing permission-validated files."""
-    cwd = Path(file_access_control.cwd).resolve()
-    pattern = (str(Path(root) / "**"))
-    matches = _glob_tool([pattern])
+    """
+    Return an indented tree view of *root* showing permission-validated files.
+    _glob_tool handles path validation itself
+    """
+
+    cwd = Path(root).resolve()
+    try:
+        Path(file_access_control.cwd).relative_to(cwd) 
+        # ValueError for absolute path
+        
+        patterns = [p for p in file_access_control.read_patterns 
+                    if Path(p).resolve().is_relative_to(cwd)]
+        matches = _glob_tool(patterns)
+        # collect only permitted pathes in CWD tree, skip entire directory scan
+    except PermissionError:
+        return f"Permission denied for root {cwd}"
+    except ValueError:
+        # root outside CWD
+        matches = _glob_tool([str(Path(cwd) / "**")])
+    
     if not matches:
         return f"tree_tool: no accessible files match {root}"  
 
     rel_paths = sorted(Path(p) for p in matches) 
     printed_dirs: set[Path] = set()
-    lines = [f"{cwd.name}/"]
+    
+    display_name = Path(root).name if root != "." else cwd.name
+    lines = [f"{display_name}/"]
 
     for rel_file in rel_paths:
         ancestors = [p for p in reversed(rel_file.parents) if p != Path(".")]
-
         for parent in ancestors:
             if parent not in printed_dirs:
-                lines.append(f"{'  ' * len(parent.parts)}{parent.name}/")
+                depth = len(parent.parts)
+                lines.append(f"{'  ' * depth}{parent.name}/")
                 printed_dirs.add(parent)
 
         lines.append(f"{'  ' * len(rel_file.parts)}{rel_file.name}")
