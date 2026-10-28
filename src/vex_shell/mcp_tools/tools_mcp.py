@@ -99,6 +99,7 @@ class MCPManager:
 
     def __init__(self):
         self.exit_stack = AsyncExitStack()
+        self.tool_sessions: dict[str,Any] = {}
 
     async def _connect_and_load(self,transport) -> list[BaseTool]:
         """Binds transport streams to ClientSession and builds MCPTools"""
@@ -117,6 +118,7 @@ class MCPManager:
                 else t.input_schema.model_dump()
             )
             clean_schema = create_pydantic_schema(t.name, raw_schema)
+            self.tool_sessions[t.name] = session
 
             LOGGER.info(str(clean_schema))
             tools.append(
@@ -128,6 +130,25 @@ class MCPManager:
                 )
             )
         return tools
+    
+    async def call_tool(self,tool_name:str,args:dict[str,Any]) -> Any:
+        if tool_name not in self.tool_sessions:
+            raise ValueError(f"tool {tool_name} not registered")
+
+        s = self.tool_sessions[tool_name]
+        res = await s.call_tool(tool_name,sanitize_arguments(args))
+
+        if not res.content:
+            return "Tool executed successfully with no output."
+        out = []
+        for chunk in res.content:
+            if getattr(chunk,"type",None):
+                out.append(chunk.text)
+            elif hasattr(chunk,"model_dump"):
+                out.append(json.dumps(chunk.model_dump()))
+            else:
+                out.append(str(chunk))
+        return '\n'.join(out)
 
     async def load_server(self, name: str, cfg: dict) -> list[BaseTool]:
         if "url" in cfg:

@@ -110,7 +110,6 @@ Full agent functionality out of the box!!
 - **UI Themes**: Define custom terminal color schemes inside src/vex_cli/colors.py.
 
 
-
 ## CLI Flags
  
 | Flag | Description |
@@ -154,9 +153,25 @@ TOTAL     1702
 - [Agentic Awareness](./docs/vex_agentic_awareness.md)
 - [Architecture Deep Dive: Startup Time & Import Optimization](./docs/vex_startup_time_optimization.md)
 
-## TODO
-- [DONE] On-demand `write_file` appending, remove if write access denied.
-- [DONE] On-The-Fly RW permission update (in CONFIG.toml)
+## Enhancement Proposals (EPs)
+- 01 [DONE] On-demand `write_file` appending, remove if write access denied.
+- 02 [DONE] On-The-Fly RW permission update (in CONFIG.toml)
+
+
+- 03 [Maybe] Add manual RAG-DB document insert by wildcard pattern with `/index <path> <domain>`
+
+Pros:
+- more deterministic index system
+Cons:
+- interface overhead, requirement for direct MCP** **tools calling(but it's likely good improvements)
+```py
+res = await mcp_manager.call_tool("insert_doc",{
+    "title":"Misra_talk_CppMeeting775955.pdf",
+    "domain":"compilers",
+    "path":"./sandbox/Misra_talk_CppMeeting775955.pdf"})
+print(res)
+```
+*Example of usage `/index compiler/*.pdf compilers`*
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.

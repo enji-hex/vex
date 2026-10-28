@@ -90,8 +90,11 @@ async def run_agent(args):
     from vex_shell.engine.agent import Agent
 
     tools,mcp_manager = await core.get_tools(settings)
+
+
     graph = core.build_graph(settings, tools)
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
+
 
     if args.export:
         await agent.export_history()
