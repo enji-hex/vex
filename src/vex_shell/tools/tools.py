@@ -62,6 +62,17 @@ def read_image(path:Path,max_dim: int = 1024) -> str:
     
     return f'data:image/jpeg;base64,{b64_data}'
 
+def _is_readable(path:Path):
+    try:
+        with open(path,'rb') as f:
+            chunk = f.read(4096)
+            if b'\x00' in chunk:
+                return False
+        chunk.decode('utf-8')
+        return True
+    except (IOError,UnicodeDecodeError):
+        return False
+
 def _read_files(
     paths: list[str],
     config: RunnableConfig,
@@ -69,6 +80,7 @@ def _read_files(
 ) -> tuple[dict[str,FileData] ,list[str]]:
     """ Return loaded files dict, messages """
 
+    max_file_size = 256 * 1024 # 256kb file limit
     use_vision = config.get('configurable',{}).get('use_vision',False)
     cwd = Path(file_access_control.cwd)
     spec = get_gitignore_spec(cwd)
@@ -79,10 +91,14 @@ def _read_files(
     for p in paths:
         try:
             target = Path(file_access_control.validate_read(p))
+            stat = target.stat()
             if not target.is_file():
                 msgs.append(f"read_files: {p}: not a file")
                 continue
-            
+            if stat.st_size > max_file_size:
+                msgs.append(f"read_files: {p}: larger than size limit (256Kb)")
+                continue
+
             rel_path = get_rel_str(target,cwd)
             if spec.match_file(rel_path):
                 msgs.append(f"read_file: {p} file is ignored by .gitignore")
@@ -94,10 +110,13 @@ def _read_files(
                 line_info = "image/base64"
                 LOGGER.debug(f'read_file image  {len(content)}')
             else:
+                if not _is_readable(target): 
+                    msgs.append(f"read_files: {p}: not a readable file")
+                    continue
+                
                 content = target.read_text(encoding='utf-8')
                 line_info = f"{len(content.splitlines())} lines"
 
-            stat = target.stat()
             loaded[rel_path] = FileData(
                 content=content,
                 size=stat.st_size,

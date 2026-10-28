@@ -20,13 +20,12 @@ if TYPE_CHECKING:
 async def get_tools(settings:Settings) -> tuple[list[BaseTool], MCPManager | None]:
     from ..tools.tools import get_tools
     tools = get_tools()
+    mcp_manager = None
+    
     if settings.chat["use_mcp"]:
         from vex_shell.mcp_tools.tools_mcp import load_mcp_tools
-
         mcp_tools, mcp_manager = await load_mcp_tools()
         tools.extend(mcp_tools)
-    else:
-        mcp_manager = None
         
     return tools,mcp_manager
 

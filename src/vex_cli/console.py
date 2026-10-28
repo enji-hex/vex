@@ -148,7 +148,6 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
     return content_str
 
 
-# move to Agent
 async def restore_history(agent, console: Console):
     messages = await agent.restore_history()
     load_last_n = agent.settings.chat["load_last_n"]

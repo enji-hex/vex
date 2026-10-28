@@ -29,7 +29,7 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
         data = params.get("data", {})
 
         if method == "tools":
-            # LOGGER.debug(f"tools: {method} {data}")
+            LOGGER.debug(f"tools: {method} {data}")
 
             event_type = data.get("event")
             if event_type == "tool-started":
@@ -53,7 +53,7 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
             else:
                 continue
 
-            # LOGGER.debug(f'messages {msg_data}')
+            LOGGER.debug(f'messages {msg_data}')
 
             if not isinstance(msg_data, dict) or not isinstance(graph_meta, dict):
                 continue
@@ -87,6 +87,7 @@ class Agent:
         self.settings = settings
         self.mcp_manager = mcp_manager
         self.conn = conn
+        self.session_id = session_id
         self.config: RunnableConfig = {
             "configurable": {
                 "thread_id": session_id,
@@ -236,6 +237,29 @@ class Agent:
 
         return recent_messages
 
+    async def export_history(self):
+        from datetime import datetime
+        import json
+
+        messages = await self.restore_history()
+        data = {
+            "version":"1.0",
+            "exported_at":datetime.now().isoformat(),
+            "model":self.settings.model['name'],
+            "messages":[
+                {"role":"system","content":self.settings.system_prompt}
+            ]}
+
+        for m in messages:
+            if m.type == "human" and isinstance(m.content,str):
+                data['messages'].append({"role":"user","content":m.content})
+            if m.type == "ai" and m.content:
+                for c in m.content:
+                    if isinstance(c, dict) and c["type"] == "text":
+                        data['messages'].append({"role":"assistant","content":c["text"]})
+
+        with open(f"./{self.session_id}.json",'w',encoding='utf-8') as f:
+            json.dump(data,f,indent=4)
 
     async def run_step(self,user_input:str) -> AsyncIterator[AgentEvent]:
         from langchain_core.messages import HumanMessage

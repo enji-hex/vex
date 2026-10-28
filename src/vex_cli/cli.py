@@ -93,6 +93,11 @@ async def run_agent(args):
     graph = core.build_graph(settings, tools)
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
 
+    if args.export:
+        await agent.export_history()
+        await agent.close()
+        return
+
     try:
         from vex_cli.console import start_session
         await start_session(agent, console)
@@ -114,6 +119,7 @@ def cli():
     parser.add_argument("--list-themes", "-lt",action="store_true", help="List available color schemes")
     parser.add_argument("--list-sessions", "-ls", action="store_true", help="List saved sessions")
     parser.add_argument("--reset", action="store_true", help="reset sqlite database")
+    parser.add_argument("--export", action="store_true", help="export selected session in json format")
     parser.add_argument(
         "--reset-global",
         action="store_true",
@@ -130,6 +136,7 @@ def cli():
     except Exception as e:
         from rich.console import Console
         Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
+        # import traceback;traceback.print_exc()
     
 
 if __name__ == "__main__":

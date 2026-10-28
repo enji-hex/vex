@@ -162,7 +162,7 @@ async def cli_command(
             "  /voice -  Voice input mode, works with v2t integration only, check readme for more details\n"
         )
         return CliResult(CliOutput.SKIP,content,"Help")
-
+    
     if cmd == "/cached":
         state = await agent.get_state()
         loaded = state.values.get("loaded_files", {})

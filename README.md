@@ -109,6 +109,8 @@ Full agent functionality out of the box!!
 - **MCP Servers**: Configure external Model Context Protocol endpoints inside .vex/mcp_config.json.
 - **UI Themes**: Define custom terminal color schemes inside src/vex_cli/colors.py.
 
+
+
 ## CLI Flags
  
 | Flag | Description |

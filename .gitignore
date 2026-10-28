@@ -14,7 +14,7 @@ wheels/
 .vex
 *.db
 */reports/
-./sandbox/*
+sandbox/
 .vscode/
 models/
 test/
