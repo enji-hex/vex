@@ -29,7 +29,7 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
         data = params.get("data", {})
 
         if method == "tools":
-            LOGGER.debug(f"tools: {method} {data}")
+            # LOGGER.debug(f"tools: {method} {data}")
 
             event_type = data.get("event")
             if event_type == "tool-started":
@@ -150,7 +150,7 @@ class Agent:
         await self.graph.aupdate_state(
             self.config,
             update_payload,
-            as_node="llm_call")
+            as_node="writer")
         LOGGER.debug(f'manual caching, cached total {len(loaded)} files')
         return msgs
     
@@ -187,80 +187,17 @@ class Agent:
             await self.graph.aupdate_state(
                 self.config,
                 {"loaded_files":purge_payloads},
-                as_node="llm_call")
+                as_node="writer")
         
         LOGGER.info(f'manual caching, del total {len(loaded)} files')
         return msgs
 
 
     async def restore_token_usage(self) -> TokenUsage:
-        """Restore token usage for message history"""
-        current_state = await self.get_state()
-
-        # empty token usage
-        if "messages" not in current_state.values:  
-            return self.token_usage
-        
-        for m in current_state.values["messages"]:
-            if hasattr(m, "usage_metadata"):
-                try:
-                    u = m.usage_metadata
-                    self.token_usage.tok_in    += u.get("input_tokens", 0)
-                    self.token_usage.tok_out   += u.get("output_tokens", 0)
-                    self.token_usage.tok_total += u.get("total_tokens", 0)
-                except Exception as err:
-                    LOGGER.error(f'Error get token usage metrics, {err}')
-        
+        from vex_shell.engine.core import graph_restore_token_usage
+        self.token_usage =  await graph_restore_token_usage(self.graph,self.config)
         return self.token_usage
     
-    async def restore_history(self) -> list[AnyMessage]:
-        state = await self.get_state()
-        messages:list[AnyMessage] | None = state.values.get("messages")
-        if not messages:
-            return []
-        
-        recent_messages = []
-        for m in messages:
-            if m.type == "human":
-                recent_messages.append(m)
-            if m.type == "ai":
-
-                if isinstance(m.content,str):
-                    recent_messages.append(m)
-                    LOGGER.debug('restore history, msg str')
-                elif isinstance(m.content, list) and \
-                    any(isinstance(c, dict) \
-                        and c.get("type") == "text" for c in m.content
-                    ):
-                    LOGGER.debug('restore history, msg list')
-                    recent_messages.append(m)
-
-        return recent_messages
-
-    async def export_history(self):
-        from datetime import datetime
-        import json
-
-        messages = await self.restore_history()
-        data = {
-            "version":"1.0",
-            "exported_at":datetime.now().isoformat(),
-            "model":self.settings.model['name'],
-            "messages":[
-                {"role":"system","content":self.settings.system_prompt}
-            ]}
-
-        for m in messages:
-            if m.type == "human" and isinstance(m.content,str):
-                data['messages'].append({"role":"user","content":m.content})
-            if m.type == "ai" and m.content:
-                for c in m.content:
-                    if isinstance(c, dict) and c["type"] == "text":
-                        data['messages'].append({"role":"assistant","content":c["text"]})
-
-        with open(f"./{self.session_id}.json",'w',encoding='utf-8') as f:
-            json.dump(data,f,indent=4)
-
     async def run_step(self,user_input:str) -> AsyncIterator[AgentEvent]:
         from langchain_core.messages import HumanMessage
         from langgraph.prebuilt import ToolCallTransformer

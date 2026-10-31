@@ -28,6 +28,7 @@ dependencies = [
     "prompt-toolkit>=3.0.52",
     "rich>=15.0.0",
     "socksio>=1.0.0",
+    "pypdf>=6.21.4",
 ]
 
 [tool.ruff.lint]

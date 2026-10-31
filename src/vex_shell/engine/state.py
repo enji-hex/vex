@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 
 from langgraph.graph.message import add_messages
 
@@ -23,6 +23,9 @@ class State(TypedDict):
     loaded_files: Annotated[dict[str, FileData],merge_dict_state]
     cwd_tree: str
     llm_calls: int
+
+    agent_role:Literal["writer","validator"]
+    route:Literal["tool_node","llm_call","end"]
 
 class FileData(TypedDict):
     content: str

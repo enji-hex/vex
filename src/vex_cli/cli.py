@@ -91,16 +91,19 @@ async def run_agent(args):
 
     tools,mcp_manager = await core.get_tools(settings)
 
+    if settings.chat.get("duo"):
+        from vex_shell.engine import duo
+        graph = duo.build_graph(settings,tools)
+    else:
+        graph = core.build_graph(settings, tools)
 
-    graph = core.build_graph(settings, tools)
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
 
-
     if args.export:
-        await agent.export_history()
+        from vex_shell.engine.core import graph_export_history
+        await graph_export_history(agent.graph,agent.config,agent.settings.model['name'],agent.settings.system_prompt,agent.session_id)
         await agent.close()
         return
-
     try:
         from vex_cli.console import start_session
         await start_session(agent, console)
@@ -139,7 +142,7 @@ def cli():
     except Exception as e:
         from rich.console import Console
         Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
-        # import traceback;traceback.print_exc()
+        import traceback;traceback.print_exc()
     
 
 if __name__ == "__main__":

@@ -35,6 +35,13 @@ def get_rel_str(p: Path, cwd: Path) -> str:
     except ValueError:
         return p.as_posix()
 
+def read_pdf(path: Path) -> str:
+    from pypdf import PdfReader
+    reader = PdfReader(path)
+    return "\n".join(
+        page.extract_text(extraction_mode="plain") or "" 
+        for page in reader.pages
+    )
 
 def read_image(path:Path,max_dim: int = 1024) -> str:
     from base64 import b64encode
@@ -95,10 +102,7 @@ def _read_files(
             if not target.is_file():
                 msgs.append(f"read_files: {p}: not a file")
                 continue
-            if stat.st_size > max_file_size:
-                msgs.append(f"read_files: {p}: larger than size limit (256Kb)")
-                continue
-
+            
             rel_path = get_rel_str(target,cwd)
             if spec.match_file(rel_path):
                 msgs.append(f"read_file: {p} file is ignored by .gitignore")
@@ -110,11 +114,18 @@ def _read_files(
                 line_info = "image/base64"
                 LOGGER.debug(f'read_file image  {len(content)}')
             else:
-                if not _is_readable(target): 
+                if suffix == "pdf":
+                    content = read_pdf(target)
+                elif not _is_readable(target): 
                     msgs.append(f"read_files: {p}: not a readable file")
                     continue
-                
-                content = target.read_text(encoding='utf-8')
+                else:
+                    # check size only for readable files, pdf ignored (be careful)
+                    if stat.st_size > max_file_size:
+                        msgs.append(f"read_files: {p}: larger than size limit (256Kb)")
+                        continue
+                    content = target.read_text(encoding='utf-8')
+
                 line_info = f"{len(content.splitlines())} lines"
 
             loaded[rel_path] = FileData(
