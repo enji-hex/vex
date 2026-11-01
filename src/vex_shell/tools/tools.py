@@ -77,7 +77,7 @@ def _is_readable(path:Path):
                 return False
         chunk.decode('utf-8')
         return True
-    except (IOError,UnicodeDecodeError):
+    except (OSError, UnicodeDecodeError):
         return False
 
 def _read_files(

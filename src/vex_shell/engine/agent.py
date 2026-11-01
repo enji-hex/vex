@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import json
 import warnings
 from collections.abc import AsyncIterator
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
 
-import json
 import aiosqlite
 from langchain_core._api.beta_decorator import LangChainBetaWarning
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 
 from vex_shell.engine.events import *
 from vex_shell.utils.config import LOGGER, Settings
@@ -18,9 +19,7 @@ warnings.simplefilter("ignore", category=LangChainBetaWarning)
 
 # import only for type checking
 if TYPE_CHECKING:
-    from langchain_core.messages import AnyMessage
     from langgraph.graph.state import CompiledStateGraph, StateGraph
-
     from vex_shell.mcp_tools.tools_mcp import MCPManager
 
 def _parse_content(text:str):
@@ -98,12 +97,14 @@ class Agent:
         self.mcp_manager = mcp_manager
         self.conn = conn
         self.session_id = session_id
+        callback = UsageMetadataCallbackHandler()
         self.config: RunnableConfig = {
             "configurable": {
                 "thread_id": session_id,
                 "use_vision": settings.model.get("use_vision", False),
                 "cache_on_write":settings.chat.get('cache_on_write',False),
-            }
+            },
+            "callbacks":[callback]
         }
         self.token_usage = TokenUsage()
 
@@ -125,7 +126,6 @@ class Agent:
         compiled_graph = graph.compile(checkpointer=checkpointer)
 
         agent =  cls(compiled_graph,session_id,settings,conn,mcp_manager)
-        await agent.restore_token_usage()
         if agent.settings.chat.get('autosync_cwd_tree',False):
             LOGGER.debug(_tree_tool())
         return agent
@@ -201,12 +201,6 @@ class Agent:
         
         LOGGER.info(f'manual caching, del total {len(loaded)} files')
         return msgs
-
-
-    async def restore_token_usage(self) -> TokenUsage:
-        from vex_shell.engine.core import graph_restore_token_usage
-        self.token_usage =  await graph_restore_token_usage(self.graph,self.config)
-        return self.token_usage
     
     async def run_step(self,user_input:str) -> AsyncIterator[AgentEvent]:
         from langchain_core.messages import HumanMessage

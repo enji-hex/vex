@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from typing import TYPE_CHECKING, TypedDict
-import json
+
 from langchain_core.messages import AIMessage
 
 if TYPE_CHECKING:
@@ -15,13 +15,15 @@ if TYPE_CHECKING:
 from vex_shell.utils.config import LOGGER
 from vex_shell.utils.file_access import file_access_control
 from vex_shell.utils.fs import sync_cwd_tree, sync_loaded_files
-from .state import FileData, State
 
+from .state import FileData, State
 
 class ValidatorResponse(TypedDict):
     accepted: bool
     content: str
 
+def newAIMessage(text,role,usage):
+    return AIMessage(content=text,response_metadata={"role":role},usage_metadata=usage)
 
 # LLM NODES
 async def llm_call_node(
@@ -43,6 +45,7 @@ async def llm_call_node(
     )
 
     role = state.get("agent_role", "writer")
+    route = "end"
     tool_names = [e.name for e in tools]
 
     llm_cfg = settings.model
@@ -52,7 +55,7 @@ async def llm_call_node(
     else:
         calls = state.get("llm_calls", 0) + 1
         final_call = calls >= max_llm_calls
-        LOGGER.debug(f'llm_calls {calls} max:{max_llm_calls} is_final:{str(final_call)}')
+        LOGGER.debug(f'llm_calls {calls} max:{max_llm_calls} is_final:{final_call!s}')
 
     # sync all loaded files — returns FRESH dict with updated content
     old_files = state.get("loaded_files", {})
@@ -64,7 +67,6 @@ async def llm_call_node(
     cwd_tree = (
         sync_cwd_tree(state) if settings.chat.get("autosync_cwd_tree", False) else None
     )
-    LOGGER.debug(f"CWD tree: {cwd_tree}")
 
     # handle sliding window
     window: int = llm_cfg.get("context_sliding_window", 10)
@@ -123,14 +125,17 @@ async def llm_call_node(
 
         model = llm if final_call else llm.bind_tools(tools)
         resp = await model.ainvoke(payload_messages, config=config)
-        LOGGER.debug(f"writer {str(resp)}")
+        usage = getattr(resp,"usage_metadata",None)
+
+        LOGGER.debug(f"writer {resp!s}")
 
         if final_call:
             resp.tool_calls = []
         else:
             resp = normalize_tool_calls(resp, tool_names)
 
-        messages = [AIMessage(content=resp.content,response_metadata={"role":role})]  # standard message
+        # standard message
+        messages = [newAIMessage(resp.content,role,usage)]
 
         # may be incorrect
         finish_reason = resp.additional_kwargs.get("finish_reason")
@@ -143,7 +148,7 @@ async def llm_call_node(
                 content="[SYSTEM: Your previous response was truncated due to token limits. "
                 "Please continue exactly where you left off in your next response.]"
             )
-            messages = [AIMessage(content=resp.content,response_metadata={"role":role}), warning_msg]
+            messages = [newAIMessage(resp.content,role,usage),warning_msg]
         
         if resp.tool_calls:
             route, next_role = "tool_node", "writer"
@@ -157,21 +162,22 @@ async def llm_call_node(
                 route, next_role = "end", "writer"
 
     else:  # curr role validator
-        system_prompt = settings.system_prompt + (
-            "\nYou are a strict validator. Review the input for correctness, flaws, and constraints. "
-            'Respond ONLY with JSON follow schema {"accepted": bool, "content": "critique or approval"}'
-        )
+        # hardcode JSON schema
+        base_prompt = settings.chat.get('validator_system_prompt', 'You are a validator.')                                                   
+        system_prompt = f"{base_prompt}\n\nRespond ONLY with JSON matching this schema: {ValidatorResponse.__annotations__}" 
         # trimmed data (writer message only)
         payload_messages = [SystemMessage(content=system_prompt)] \
             + state["messages"][-1:]
 
         model = llm.with_structured_output(ValidatorResponse, include_raw=True)
         resp_out = await model.ainvoke(payload_messages, config=config)
+        
 
         LOGGER.info(str(resp_out))
 
         try:
             data = resp_out["parsed"]
+            usage = getattr(resp_out['raw'],"usage_metadata",None)
             accepted = data.get("accepted", False)
             content = data.get("content", "No content provided.")
 
@@ -180,16 +186,14 @@ async def llm_call_node(
             else:
                 route, next_role = "llm_call", "writer"
 
-            LOGGER.debug(f"validator {str(accepted)} {content}")
-            messages = [AIMessage(content=content,response_metadata={"role":role})]
+            LOGGER.debug(f"validator {accepted!s} {content}")
+            messages = [newAIMessage(content,role,usage)]
+
 
         except Exception as err:
             LOGGER.warning(f"error parse validator response {err}")
             route, next_role = "llm_call", "writer"
-            messages = [
-                AIMessage(content=f"[FAIL] Error parsing validator response: {err}",
-                response_metadata={"role":role})
-            ]
+            messages = [newAIMessage(f"[FAIL] Error parsing validator response: {err}",role,usage)]
 
     return {
         "messages": messages,
@@ -203,21 +207,18 @@ async def llm_call_node(
 
 def should_verify(state: State, settings: Settings):
     from langchain_core.messages import ToolMessage
-
     last_msg = state["messages"][-1]
 
-    need_verify = settings.verification.get(
-        "check_command"
-    ) or settings.verification.get("observe_command")
+    need_verify = settings.verification.get("check_command") \
+        or settings.verification.get("observe_command")
 
-    if (
-        isinstance(last_msg, ToolMessage)
+    if (isinstance(last_msg, ToolMessage)
         and last_msg.name == "write_file"
-        and need_verify
-    ):
+        and need_verify):
         LOGGER.info("should verify , last mesage write")
         return "verification_node"
-    return "llm_call"
+
+    return "writer"
 
 
 async def _exec(cmd: str) -> tuple:

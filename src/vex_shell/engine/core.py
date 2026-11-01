@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from functools import partial
-from typing import TYPE_CHECKING, Any
 from dataclasses import dataclass
+from functools import partial
+from typing import TYPE_CHECKING, Hashable, Tuple
+
 from langchain_core.messages import AnyMessage
 
 from vex_shell.engine.events import TokenUsage
@@ -22,7 +23,6 @@ class SavedMessage:
 if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
     from langgraph.graph.state import StateGraph
-
     from vex_shell.mcp_tools.tools_mcp import MCPManager
     from vex_shell.utils.config import Settings
 
@@ -50,23 +50,41 @@ def build_graph(settings: Settings, tools: list[BaseTool]) -> StateGraph:
     from .state import State
 
     graph = StateGraph(State)
+    duo = settings.chat.get("duo", False)
 
     # LLM Nodes
     graph.add_node("writer", partial(llm_call_node, settings=settings, tools=tools))
     graph.add_node("tool_node", ToolNode(tools))
     graph.add_node("verification_node", partial(verification_node, settings=settings))
+    if duo:
+        graph.add_node("validator",partial(llm_call_node,settings=settings,tools=tools))
 
     # Graph Edges
     graph.add_edge(START, "writer")
-    graph.add_conditional_edges("writer", should_continue, ["tool_node", END])
+    writer_map: dict[Hashable,str] = {
+        "tool_node":"tool_node",
+        "end":"__end__",
+        "llm_call":"validator" if duo else "__end__"
+    }
+    
+    if duo:
+        graph.add_conditional_edges("writer", lambda s:s.get("route","end"),writer_map)
+    else:
+        graph.add_conditional_edges("writer", should_continue, ["tool_node", END])
+
     graph.add_conditional_edges(
         "tool_node",  # source node
         partial(should_verify, settings=settings),  # check condition
-        # path maps
-        # llm_call str -> route to llm_call function
         {"verification_node": "verification_node", "writer": "writer"},
     )
-    graph.add_edge("verification_node", "writer")
+    graph.add_edge("verification_node", "validator" if duo else "writer")
+    if duo:
+        graph.add_conditional_edges(
+            "validator",
+            lambda s: s.get("route","end"),
+            {"writer":"writer","end":"__end__"}
+        )
+
     return graph
 
 
@@ -74,15 +92,24 @@ def build_graph(settings: Settings, tools: list[BaseTool]) -> StateGraph:
 async def graph_get_state(graph, config):
     return await graph.aget_state(config)
 
-
-async def graph_restore_history(graph, config) -> list[SavedMessage]:
+async def graph_restore_history(graph, config) -> Tuple[list[SavedMessage],TokenUsage]:
     state = await graph_get_state(graph, config)
-    messages: list[AnyMessage] | None = state.values.get("messages")
+    token_usage = TokenUsage()
+    messages: list | None = state.values.get("messages")
     if not messages:
-        return []
+        return [],token_usage
 
     recent_messages = []
     for m in messages:
+        if hasattr(m,"usage_metadata") and m.usage_metadata:
+            try:
+                u = m.usage_metadata
+                token_usage.tok_in += u.get("input_tokens", 0)
+                token_usage.tok_out += u.get("output_tokens", 0)
+                token_usage.tok_total += u.get("total_tokens", 0)
+            except Exception as err:
+                LOGGER.error(f"Error get token usage metrics, {err}",exc_info=True)
+
         role = m.response_metadata.get("role") or m.additional_kwargs.get("role")
         # fallback to old checkpointers
         if role is None: 
@@ -98,16 +125,16 @@ async def graph_restore_history(graph, config) -> list[SavedMessage]:
                 if any(isinstance(c, dict) and c.get("type") == "text" for c in m.content):
                     recent_messages.append(SavedMessage(m,role))
 
-    return recent_messages
+    return recent_messages,token_usage
 
 
 async def graph_export_history(
     graph, config, model_name: str, system_prompt: str, session_id: str
 ):
-    from datetime import datetime
     import json
+    from datetime import datetime
 
-    messages = await graph_restore_history(graph, config)
+    messages,token_usage = await graph_restore_history(graph, config)
     data = {
         "version": "1.0",
         "exported_at": datetime.now().isoformat(),
@@ -128,24 +155,3 @@ async def graph_export_history(
 
     with open(f"./{session_id}.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
-
-
-async def graph_restore_token_usage(graph, config) -> TokenUsage:
-    """Restore token usage for message history"""
-    current_state = await graph_get_state(graph, config)
-    token_usage = TokenUsage()
-
-    # empty token usage
-    if "messages" not in current_state.values:
-        return token_usage
-
-    for m in current_state.values["messages"]:
-        if hasattr(m, "usage_metadata"):
-            try:
-                u = m.usage_metadata
-                token_usage.tok_in += u.get("input_tokens", 0)
-                token_usage.tok_out += u.get("output_tokens", 0)
-                token_usage.tok_total += u.get("total_tokens", 0)
-            except Exception as err:
-                LOGGER.error(f"Error get token usage metrics, {err}")
-    return token_usage

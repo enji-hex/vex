@@ -90,12 +90,7 @@ async def run_agent(args):
     from vex_shell.engine.agent import Agent
 
     tools,mcp_manager = await core.get_tools(settings)
-
-    if settings.chat.get("duo"):
-        from vex_shell.engine import duo
-        graph = duo.build_graph(settings,tools)
-    else:
-        graph = core.build_graph(settings, tools)
+    graph = core.build_graph(settings, tools)
 
     agent = await Agent.create(graph, args.session, settings, mcp_manager)
 

@@ -150,7 +150,9 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
 async def restore_history(agent, console: Console):
     from vex_shell.engine.core import graph_restore_history
 
-    messages = await graph_restore_history(agent.graph,agent.config)
+    messages,token_usage = await graph_restore_history(agent.graph,agent.config)
+    agent.token_usage = token_usage
+    
     load_last_n = agent.settings.chat["load_last_n"]
 
     LOGGER.info(f"found messages {len(messages)}")
