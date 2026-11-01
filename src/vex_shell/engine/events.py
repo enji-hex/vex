@@ -15,7 +15,8 @@ class ToolStop:
 
 @dataclass
 class TextFinish:
-    text: str
+    content: str
+    role:str
 
 @dataclass
 class TokenUsage:

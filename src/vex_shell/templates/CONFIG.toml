@@ -4,7 +4,7 @@ logging_level = "debug"
 # control imported MCP tools only, core tools available always, 
 # Important MCP tools NOT restricted by R/W permission management
 use_mcp =  false
-
+duo = false # testing mode
 
 # count of messages loaded in console (not sliding window)
 load_last_n =  10

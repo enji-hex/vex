@@ -71,11 +71,11 @@ def show_transient_panel(content: str, title: str, console: Console):
         console.show_cursor(True)
         console.file.flush()
 
-def write_msg(text:str,_from:Literal["VEX","SHELL"],console:Console):
+def write_msg(text:str,_from:str,console:Console):
     if _from == 'SHELL':
-        console.print(f"\n[vex.prompt]SHELL > [/vex.prompt] {text}")
+        console.print(f"\n[vex.prompt][ SHELL ][/vex.prompt] {text}")
     else:
-        console.print(f"\n[vex.tool]{_from} >[/vex.tool]")
+        console.print(f"\n[vex.tool][ {_from} ][/vex.tool]")
         console.print(Markdown(text, code_theme="monokai"))
         console.print()
         console.rule(style="vex.muted")
@@ -87,7 +87,6 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
     content_str = ""
     active_tools: dict[str, ToolStart] = {}
     tool_logs: list[str] = []
-    
     current_status = "VEX thinking..."
 
     def generate_temp_ui() -> Panel:
@@ -142,8 +141,8 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                 live.update(generate_temp_ui())
             
             elif isinstance(ev,TextFinish):
-                content_str += ev.text
-                write_msg(ev.text,'VEX',console)
+                content_str += ev.content
+                write_msg(ev.content,ev.role,console)
 
     return content_str
 
@@ -160,12 +159,16 @@ async def restore_history(agent, console: Console):
         messages = messages[-load_last_n:]
 
     for m in messages:
-        if m.type == "human" and isinstance(m.content,str):
-            write_msg(m.content,'SHELL',console)
-        if m.type == "ai" and m.content:
-            for c in m.content:
-                if isinstance(c, dict) and c["type"] == "text":
-                    write_msg(c["text"],'VEX',console)
+        if m.role == "user" and isinstance(m.message.content,str):
+            write_msg(m.message.content,'SHELL',console)
+        else:
+            if isinstance(m.message.content,list):
+                for c in m.message.content:
+                    if isinstance(c, dict) and c["type"] == "text":
+                        write_msg(c["text"],m.role,console)
+            
+            elif isinstance(m.message.content,str):
+                write_msg(m.message.content,m.role,console)
 
 async def start_session(
     agent: Agent,

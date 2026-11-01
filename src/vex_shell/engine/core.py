@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
 from langchain_core.messages import AnyMessage
 
 from vex_shell.engine.events import TokenUsage
@@ -12,6 +12,11 @@ from vex_shell.utils.config import LOGGER
 # thi shit imports ENTIRE langgraph.graph module!!!
 END = "__end__"
 START = "__start__"
+
+@dataclass
+class SavedMessage:
+    message:AnyMessage
+    role:str # user or agent_name
 
 # import only for type checking
 if TYPE_CHECKING:
@@ -70,7 +75,7 @@ async def graph_get_state(graph, config):
     return await graph.aget_state(config)
 
 
-async def graph_restore_history(graph, config) -> list[AnyMessage]:
+async def graph_restore_history(graph, config) -> list[SavedMessage]:
     state = await graph_get_state(graph, config)
     messages: list[AnyMessage] | None = state.values.get("messages")
     if not messages:
@@ -78,16 +83,21 @@ async def graph_restore_history(graph, config) -> list[AnyMessage]:
 
     recent_messages = []
     for m in messages:
-        if m.type == "human":
-            recent_messages.append(m)
-        if m.type == "ai":
+        role = m.response_metadata.get("role") or m.additional_kwargs.get("role")
+        # fallback to old checkpointers
+        if role is None: 
+            role = 'VEX' if m.type == "ai" else "user"
 
-            if isinstance(m.content, str):
-                recent_messages.append(m)
-            elif isinstance(m.content, list) and any(
-                isinstance(c, dict) and c.get("type") == "text" for c in m.content
-            ):
-                recent_messages.append(m)
+        LOGGER.debug(f"Message from role: {role} | Content: {m}")
+        if m.type == "human":
+            recent_messages.append(SavedMessage(m,role))
+        elif m.type == "ai":
+            if isinstance(m.content, str) and m.content.strip():
+                recent_messages.append(SavedMessage(m,role))
+            elif isinstance(m.content, list):
+                if any(isinstance(c, dict) and c.get("type") == "text" for c in m.content):
+                    recent_messages.append(SavedMessage(m,role))
+
     return recent_messages
 
 
@@ -105,21 +115,24 @@ async def graph_export_history(
         "messages": [{"role": "system", "content": system_prompt}],
     }
 
-    for m in messages:
-        if m.type == "human" and isinstance(m.content, str):
-            data["messages"].append({"role": "user", "content": m.content})
-        if m.type == "ai" and m.content:
-            for c in m.content:
+    for msg in messages:
+        if msg.role == "user" and isinstance(msg.message.content, str):
+            data["messages"].append({"role": "user", "content": msg.message.content})
+        
+        elif isinstance(msg.message.content,str):
+            data["messages"].append({"role": msg.role, "content": msg.message.content})
+        elif isinstance(msg.message.content,list):
+            for c in msg.message.content:
                 if isinstance(c, dict) and c["type"] == "text":
-                    data["messages"].append({"role": "assistant", "content": c["text"]})
+                    data["messages"].append({"role": msg.role, "content": c["text"]})
 
     with open(f"./{session_id}.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
 
-async def graph_restore_token_usage(graph,config) -> TokenUsage:
+async def graph_restore_token_usage(graph, config) -> TokenUsage:
     """Restore token usage for message history"""
-    current_state = await graph_get_state(graph,config)
+    current_state = await graph_get_state(graph, config)
     token_usage = TokenUsage()
 
     # empty token usage

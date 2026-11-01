@@ -6,6 +6,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
 
+import json
 import aiosqlite
 from langchain_core._api.beta_decorator import LangChainBetaWarning
 
@@ -21,6 +22,14 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph, StateGraph
 
     from vex_shell.mcp_tools.tools_mcp import MCPManager
+
+def _parse_content(text:str):
+    """Parse .content or return text as-is"""
+    try:
+        return json.loads(text).get("content","")
+    except:
+        return text
+    
 
 async def process(stream) -> AsyncIterator[AgentEvent]:
     async for event in stream:
@@ -53,16 +62,17 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
             else:
                 continue
 
-            LOGGER.debug(f'messages {msg_data}')
-
             if not isinstance(msg_data, dict) or not isinstance(graph_meta, dict):
                 continue
             event_type = msg_data.get("event")
+            node_name = graph_meta.get("langgraph_node","VEX")
+            LOGGER.debug(f'messages {node_name} {msg_data}')
 
+            # here's just raw json, instead of description field
             if event_type == "content-block-finish":
                 text = msg_data.get("content",{}).get("text")
                 if text:
-                    yield TextFinish(text)
+                    yield TextFinish(_parse_content(text),node_name)
 
             if event_type == "message-finish" and "usage" in msg_data:
                 usage = msg_data["usage"]
@@ -205,9 +215,9 @@ class Agent:
         # reset llm_calls
         stream = await self.graph.astream_events(
             {
-                "messages": [HumanMessage(content=user_input)],
-                "llm_calls":0,
-                },
+                "messages": [HumanMessage(content=user_input,response_metadata={"role":"user"})],
+                "llm_calls":0
+            },
             config=self.config,
             version="v3",
             transformers=[ToolCallTransformer],

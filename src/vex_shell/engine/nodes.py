@@ -17,9 +17,11 @@ from vex_shell.utils.file_access import file_access_control
 from vex_shell.utils.fs import sync_cwd_tree, sync_loaded_files
 from .state import FileData, State
 
+
 class ValidatorResponse(TypedDict):
-    accepted:bool
-    description:str
+    accepted: bool
+    content: str
+
 
 # LLM NODES
 async def llm_call_node(
@@ -50,6 +52,7 @@ async def llm_call_node(
     else:
         calls = state.get("llm_calls", 0) + 1
         final_call = calls >= max_llm_calls
+        LOGGER.debug(f'llm_calls {calls} max:{max_llm_calls} is_final:{str(final_call)}')
 
     # sync all loaded files — returns FRESH dict with updated content
     old_files = state.get("loaded_files", {})
@@ -67,22 +70,6 @@ async def llm_call_node(
     window: int = llm_cfg.get("context_sliding_window", 10)
     recent = get_safe_window(state["messages"], window)
 
-    # system prompt mutation
-    if role == "validator":
-        system_prompt = settings.system_prompt + (
-            "\nYou are a strict validator. Review the input for correctness, flaws, and constraints. "
-            'Respond ONLY with JSON follow schema {"accepted": bool, "description": "critique or approval"}'
-        )
-    else:
-        system_prompt = settings.system_prompt
-        if final_call:
-            system_prompt += (
-                "\nThis is your final response for this user turn. "
-                "Do not call tools. Give the user the best answer you can "
-                "based on the available information."
-            )
-    system_msg = SystemMessage(content=system_prompt)
-
     # Handle file_context — use FRESH snap, not stale state
     env_block = file_access_control.build_environment_context()
     context_blocks, image_paths = format_file_context(
@@ -98,9 +85,6 @@ async def llm_call_node(
         LOGGER.debug(
             f"Purged {len(image_paths)} image(s) from loaded_files after injection"
         )
-
-    ephemeral_context_msg = HumanMessage(content=context_blocks)
-    payload_messages = [system_msg] + recent + [ephemeral_context_msg]
 
     # reasoning
     # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
@@ -118,24 +102,36 @@ async def llm_call_node(
         stream_usage=True,
         stream_chunk_timeout=int(stream_chunk_timeout),
         extra_body=llm_cfg.get("extra_body"),
-        reasoning=llm_cfg.get("reasoning")
+        reasoning=llm_cfg.get("reasoning"),
     )
     LOGGER.debug(f'extra body {llm_cfg.get("extra_body",{})}')
-    
-    
-    
+
     if role == "writer":
+        system_prompt = settings.system_prompt
+        if final_call:
+            system_prompt += (
+                "\nThis is your final response for this user turn. "
+                "Do not call tools. Give the user the best answer you can "
+                "based on the available information."
+            )
+
+        # full active context
+        ephemeral_context_msg = HumanMessage(content=context_blocks)
+        payload_messages = (
+            [SystemMessage(content=system_prompt)] + recent + [ephemeral_context_msg]
+        )
+
         model = llm if final_call else llm.bind_tools(tools)
-        resp  = await model.ainvoke(payload_messages, config=config)
-        LOGGER.debug(f'writer {str(resp)}')
-        
+        resp = await model.ainvoke(payload_messages, config=config)
+        LOGGER.debug(f"writer {str(resp)}")
+
         if final_call:
             resp.tool_calls = []
         else:
             resp = normalize_tool_calls(resp, tool_names)
 
-        messages = [resp] # standard message
-        
+        messages = [AIMessage(content=resp.content,response_metadata={"role":role})]  # standard message
+
         # may be incorrect
         finish_reason = resp.additional_kwargs.get("finish_reason")
         if finish_reason == "length":
@@ -147,43 +143,53 @@ async def llm_call_node(
                 content="[SYSTEM: Your previous response was truncated due to token limits. "
                 "Please continue exactly where you left off in your next response.]"
             )
-            messages = [resp, warning_msg]
+            messages = [AIMessage(content=resp.content,response_metadata={"role":role}), warning_msg]
         
         if resp.tool_calls:
-            route,next_role = "tool_node","writer"
+            route, next_role = "tool_node", "writer"
         else:
             if settings.chat.get("duo") == True:
-                route,next_role = "llm_call","validator"
+                if final_call:
+                    route, next_role = "end", "writer"
+                else:
+                    route, next_role = "llm_call", "validator"
             else:
-                route,next_role = "end","writer"
-    
-    else: # curr role validator
-        model = llm.with_structured_output(ValidatorResponse,include_raw=True)
-        resp_out = await model.ainvoke(payload_messages,config=config)
+                route, next_role = "end", "writer"
+
+    else:  # curr role validator
+        system_prompt = settings.system_prompt + (
+            "\nYou are a strict validator. Review the input for correctness, flaws, and constraints. "
+            'Respond ONLY with JSON follow schema {"accepted": bool, "content": "critique or approval"}'
+        )
+        # trimmed data (writer message only)
+        payload_messages = [SystemMessage(content=system_prompt)] \
+            + state["messages"][-1:]
+
+        model = llm.with_structured_output(ValidatorResponse, include_raw=True)
+        resp_out = await model.ainvoke(payload_messages, config=config)
 
         LOGGER.info(str(resp_out))
 
         try:
-            data = resp_out['parsed']
-            
-            accepted    = data.get("accepted", False)
-            description = data.get("description", "No description provided.")
+            data = resp_out["parsed"]
+            accepted = data.get("accepted", False)
+            content = data.get("content", "No content provided.")
 
             if accepted:
-                route,next_role = "end","writer"
+                route, next_role = "end", "writer"
             else:
-                route,next_role = "llm_call","writer"
-            
-            status      = "OK" if accepted else "FAIL"
-            msg         = f"[{status}] {description}"
-            
-            LOGGER.debug('validator '+msg)
-            messages = [AIMessage(content=msg)]
+                route, next_role = "llm_call", "writer"
+
+            LOGGER.debug(f"validator {str(accepted)} {content}")
+            messages = [AIMessage(content=content,response_metadata={"role":role})]
 
         except Exception as err:
             LOGGER.warning(f"error parse validator response {err}")
             route, next_role = "llm_call", "writer"
-            messages = [AIMessage(content=f"[FAIL] Error parsing validator response: {err}")]
+            messages = [
+                AIMessage(content=f"[FAIL] Error parsing validator response: {err}",
+                response_metadata={"role":role})
+            ]
 
     return {
         "messages": messages,
@@ -191,7 +197,7 @@ async def llm_call_node(
         "loaded_files": loaded_update,
         "cwd_tree": cwd_tree,
         "route": route,
-        "agent_role": next_role
+        "agent_role": next_role,
     }
 
 
