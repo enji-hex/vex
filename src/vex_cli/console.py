@@ -1,4 +1,4 @@
-import io,os,sys,time
+import io, os, sys, time
 from typing import Literal
 
 from rich.box import SQUARE
@@ -26,6 +26,7 @@ if hasattr(sys.stdout, "reconfigure"):
 def clean_snippet(text: str, limit: int = 60) -> str:
     cleaned = " ".join(text.splitlines()).strip()
     return cleaned[:limit] if cleaned else ""
+
 
 def wait_for_key():
     if os.name == "nt":
@@ -71,14 +72,16 @@ def show_transient_panel(content: str, title: str, console: Console):
         console.show_cursor(True)
         console.file.flush()
 
-def write_msg(text:str,_from:str,console:Console):
-    if _from == 'SHELL':
+
+def write_msg(text: str, _from: str, console: Console):
+    if _from == "SHELL":
         console.print(f"\n[vex.prompt][ SHELL ][/vex.prompt] {text}")
     else:
         console.print(f"\n[vex.tool][ {_from} ][/vex.tool]")
         console.print(Markdown(text, code_theme="monokai"))
         console.print()
         console.rule(style="vex.muted")
+
 
 async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> str:
     """
@@ -129,7 +132,7 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                 active_tools[ev.tool_id] = ev
                 live.update(generate_temp_ui())
             elif isinstance(ev, ToolStop):
-                tool_start = active_tools.pop(ev.tool_id,None)
+                tool_start = active_tools.pop(ev.tool_id, None)
                 if tool_start:
                     out_snippet = clean_snippet(ev.tool_out) or "done"
                     in_snippet = clean_snippet(tool_start.tool_in)
@@ -139,10 +142,10 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
                     )
                 current_status = "VEX is thinking..."
                 live.update(generate_temp_ui())
-            
-            elif isinstance(ev,TextFinish):
+
+            elif isinstance(ev, TextFinish):
                 content_str += ev.content
-                write_msg(ev.content,ev.role,console)
+                write_msg(ev.content, ev.role, console)
 
     return content_str
 
@@ -150,9 +153,9 @@ async def execute_agent_step(stream, keep_tool_logs: bool, console: Console) -> 
 async def restore_history(agent, console: Console):
     from vex_shell.engine.core import graph_restore_history
 
-    messages,token_usage = await graph_restore_history(agent.graph,agent.config)
+    messages, token_usage = await graph_restore_history(agent.graph, agent.config)
     agent.token_usage = token_usage
-    
+
     load_last_n = agent.settings.chat["load_last_n"]
 
     LOGGER.info(f"found messages {len(messages)}")
@@ -161,16 +164,17 @@ async def restore_history(agent, console: Console):
         messages = messages[-load_last_n:]
 
     for m in messages:
-        if m.role == "user" and isinstance(m.message.content,str):
-            write_msg(m.message.content,'SHELL',console)
+        if m.role == "user" and isinstance(m.message.content, str):
+            write_msg(m.message.content, "SHELL", console)
         else:
-            if isinstance(m.message.content,list):
+            if isinstance(m.message.content, list):
                 for c in m.message.content:
                     if isinstance(c, dict) and c["type"] == "text":
-                        write_msg(c["text"],m.role,console)
-            
-            elif isinstance(m.message.content,str):
-                write_msg(m.message.content,m.role,console)
+                        write_msg(c["text"], m.role, console)
+
+            elif isinstance(m.message.content, str):
+                write_msg(m.message.content, m.role, console)
+
 
 async def start_session(
     agent: Agent,
@@ -180,23 +184,30 @@ async def start_session(
     keep_tool_logs: bool = not agent.settings.chat["keep_tool_logs"]
     await restore_history(agent, console)
 
-    commands = ["/q", "/help", "/stat", "/env", "/cached", "/read", "/del","/voice"]
+    commands = ["/q", "/help", "/stat", "/env", "/cached", "/read", "/del", "/voice"]
     prompt_session = prompt.Prompt(console, commands)
 
     user_input_default = ""
-    
+
     start_ns = os.environ.get("VEX_START_NS")
     if start_ns:
         elapsed_ms = (time.perf_counter_ns() - int(start_ns)) / 1_000_000
-        LOGGER.debug(f'console started, elapsed time {elapsed_ms:.2f}ms')
+        LOGGER.debug(f"console started, elapsed time {elapsed_ms:.2f}ms")
 
     while True:
         await agent.reconfigure_settings()
 
-        user_input = await prompt_session.ask(
-            "\n[vex.prompt]SHELL > [/vex.prompt]",
-            # pass recorded string in user input if exists
-            default=user_input_default) 
+        try:
+            user_input = await prompt_session.ask(
+                "\n[vex.prompt]SHELL > [/vex.prompt]",
+                # pass recorded string in user input if exists
+                default=user_input_default,
+            )
+        except KeyboardInterrupt:
+            console.print("[vex.muted]^C — type /q to quit[/vex.muted]")
+            continue
+        except EOFError:
+            break  # Ctrl-D
         user_input_default = ""
 
         if not user_input:
@@ -206,26 +217,37 @@ async def start_session(
         if user_input.startswith("/"):
             sys.stdout.write("\x1b[1A\x1b[2K")
             sys.stdout.flush()
-            cmd_resp = await cli_command(user_input.lower(), agent, 
-                                         console=console,
-                                         prompt_session=prompt_session.prompt_session)
-            
+            cmd_resp = await cli_command(
+                user_input.lower(),
+                agent,
+                console=console,
+                prompt_session=prompt_session.prompt_session,
+            )
+
             match cmd_resp.result:
                 case CliOutput.SKIP:
-                    show_transient_panel(cmd_resp.content,cmd_resp.title,console)
+                    show_transient_panel(cmd_resp.content, cmd_resp.title, console)
                     continue
                 case CliOutput.EXIT:
                     break
                 case CliOutput.RENDER:
                     # /voice
                     user_input_default = cmd_resp.content
-                    LOGGER.info(f'user transcription {cmd_resp}')
+                    LOGGER.info(f"user transcription {cmd_resp}")
                     continue
-                
 
         # clean history
         LOGGER.info(f'user: {user_input.replace("\n"," ")}')
 
-        stream = agent.run_step(user_input)
-        resp = await execute_agent_step(stream, keep_tool_logs, console)
+        try:
+            stream = agent.run_step(user_input)
+            resp = await execute_agent_step(stream, keep_tool_logs, console)
+        except KeyboardInterrupt:
+            console.print("\n[vex.muted]turn cancelled[/vex.muted]")
+            continue
+        except Exception as err:
+            LOGGER.exception("turn failed")
+            console.print(f"[vex.tool]turn failed:[/vex.tool] {err}")
+            import traceback;traceback.print_exc()
+            continue
         LOGGER.info(f'agent: {resp.replace("\n"," ")}')

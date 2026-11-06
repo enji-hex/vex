@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import os
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, SystemMessage
 
 if TYPE_CHECKING:
     from langchain.tools import BaseTool
@@ -15,88 +14,33 @@ if TYPE_CHECKING:
 from vex_shell.utils.config import LOGGER
 from vex_shell.utils.file_access import file_access_control
 from vex_shell.utils.fs import sync_cwd_tree, sync_loaded_files
+from vex_shell.engine.schema_generator import get_schema
 
 from .state import FileData, State
 
 class ValidatorResponse(TypedDict):
-    accepted: bool
-    content: str
+    accepted: Annotated[bool, "Is agent response accepted"]
+    content: Annotated[str, "The reason of decision"]
 
-def newAIMessage(text,role,usage):
-    return AIMessage(content=text,response_metadata={"role":role},usage_metadata=usage)
+def newAIMessage(text,role,usage,tool_calls=None):
+    return AIMessage(
+        content=text,
+        response_metadata={"role":role},
+        usage_metadata=usage,
+        tool_calls=tool_calls or [])
 
-# LLM NODES
-async def llm_call_node(
-    state: State, config: RunnableConfig, settings: Settings, tools: list[BaseTool]
-):
-    """
-    Handle errors
-    - 429
-    - Bad model
-    - No tool support
-    """
-    from langchain.messages import HumanMessage, SystemMessage
+
+def build_llm(settings: Settings):
     from langchain_openai import ChatOpenAI
-
-    from .helpers import (
-        format_file_context,
-        get_safe_window,
-        normalize_tool_calls,
-    )
-
-    role = state.get("agent_role", "writer")
-    route = "end"
-    tool_names = [e.name for e in tools]
+    import os
 
     llm_cfg = settings.model
-    max_llm_calls = int(llm_cfg.get("max_llm_calls", 3))
-    if max_llm_calls == -1:
-        final_call = False
-    else:
-        calls = state.get("llm_calls", 0) + 1
-        final_call = calls >= max_llm_calls
-        LOGGER.debug(f'llm_calls {calls} max:{max_llm_calls} is_final:{final_call!s}')
-
-    # sync all loaded files — returns FRESH dict with updated content
-    old_files = state.get("loaded_files", {})
-    new_files = sync_loaded_files(old_files)
-    loaded_update: dict[str, FileData | None] = {p: d for p, d in new_files.items()}
-    loaded_update.update({p: None for p in old_files.keys() - new_files.keys()})
-
-    # !! Move to model scope
-    cwd_tree = (
-        sync_cwd_tree(state) if settings.chat.get("autosync_cwd_tree", False) else None
-    )
-
-    # handle sliding window
-    window: int = llm_cfg.get("context_sliding_window", 10)
-    recent = get_safe_window(state["messages"], window)
-
-    # Handle file_context — use FRESH snap, not stale state
-    env_block = file_access_control.build_environment_context()
-    context_blocks, image_paths = format_file_context(
-        new_files,
-        env_block,
-        config.get("configurable", {}).get("use_vision", False),
-        cwd_tree=cwd_tree,
-    )
-
-    if image_paths:
-        for p in image_paths:
-            loaded_update[p] = None
-        LOGGER.debug(
-            f"Purged {len(image_paths)} image(s) from loaded_files after injection"
-        )
-
-    # reasoning
-    # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
-
     stream_chunk_timeout = llm_cfg.get("ollama", {}).get("stream_chunk_timeout", "0")
-    llm = ChatOpenAI(
+    return ChatOpenAI(
         openai_proxy=llm_cfg.get("proxy"),
         model=llm_cfg["name"],
         base_url=llm_cfg.get("llm_url", "http://localhost:11434/v1"),
-        api_key=os.environ.get("VEX_API_KEY", "llama"),  # fallback for local model
+        api_key=os.environ.get("VEX_API_KEY", "llama"),
         temperature=llm_cfg["temperature"],
         max_completion_tokens=llm_cfg.get("max_completion_tokens"),
         max_retries=int(llm_cfg["max_retries"]),
@@ -106,106 +50,155 @@ async def llm_call_node(
         extra_body=llm_cfg.get("extra_body"),
         reasoning=llm_cfg.get("reasoning"),
     )
-    LOGGER.debug(f'extra body {llm_cfg.get("extra_body",{})}')
 
-    if role == "writer":
-        system_prompt = settings.system_prompt
-        if final_call:
-            system_prompt += (
-                "\nThis is your final response for this user turn. "
-                "Do not call tools. Give the user the best answer you can "
-                "based on the available information."
-            )
+# LLM NODES
 
-        # full active context
-        ephemeral_context_msg = HumanMessage(content=context_blocks)
-        payload_messages = (
-            [SystemMessage(content=system_prompt)] + recent + [ephemeral_context_msg]
+# LLM NODES
+async def writer_node(
+    state: State, config: RunnableConfig, settings: Settings, tools: list[BaseTool]
+):
+    from langchain.messages import HumanMessage, SystemMessage
+    from .helpers import (
+        format_file_context,
+        get_safe_window,
+        normalize_tool_calls,
+    )
+
+    role = "writer"
+    tool_names = [e.name for e in tools]
+
+    max_llm_calls = int(settings.model.get("max_llm_calls", 3))
+    calls = state.get("llm_calls", 0) + 1
+    final_call = max_llm_calls != -1 and calls >= max_llm_calls
+
+    # sync all loaded files — returns FRESH dict with updated content
+    old_files = state.get("loaded_files", {})
+    new_files = sync_loaded_files(old_files)
+    loaded_update: dict[str, FileData | None] = {p: d for p, d in new_files.items()}
+    loaded_update.update({p: None for p in old_files.keys() - new_files.keys()})
+    cwd_tree = (
+        sync_cwd_tree(state) if settings.chat.get("autosync_cwd_tree", False) else None
+    )
+
+    window = int(settings.model.get("context_sliding_window", 10))
+    recent = get_safe_window(state["messages"], window)
+    env_block = file_access_control.build_environment_context()
+    context_blocks, image_paths = format_file_context(
+        new_files,
+        env_block,
+        config.get("configurable", {}).get("use_vision", False),
+        cwd_tree=cwd_tree,
+    )
+
+    for p in image_paths:
+        loaded_update[p] = None
+
+    # reasoning
+    # https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+    llm = build_llm(settings)
+    system_prompt = settings.system_prompt
+    if final_call:
+        LOGGER.warning(f"final call {calls}")
+        system_prompt += (
+            "\nThis is your final response for this user turn. "
+            "Do not call tools. Give the user the best answer you can "
+            "based on the available information."
         )
 
-        model = llm if final_call else llm.bind_tools(tools)
-        resp = await model.ainvoke(payload_messages, config=config)
-        usage = getattr(resp,"usage_metadata",None)
+    # full active context
+    ephemeral_context_msg = HumanMessage(content=context_blocks)
+    payload_messages = (
+        [SystemMessage(content=system_prompt)] + recent + [ephemeral_context_msg]
+    )
+    model = llm if final_call else llm.bind_tools(tools)
+    resp = await model.ainvoke(payload_messages, config=config)
+    usage = getattr(resp, "usage_metadata", None)
 
-        LOGGER.debug(f"writer {resp!s}")
+    LOGGER.debug(f"writer {resp!s}")
 
-        if final_call:
-            resp.tool_calls = []
-        else:
-            resp = normalize_tool_calls(resp, tool_names)
+    if final_call:
+        resp.tool_calls = []
+    else:
+        resp = normalize_tool_calls(resp, tool_names)
 
-        # standard message
-        messages = [newAIMessage(resp.content,role,usage)]
+    # standard message
+    messages = [newAIMessage(resp.content, role, usage,resp.tool_calls)]
+    # check it
+    finish_reason = (
+        resp.response_metadata.get("finish_reason")
+        or resp.additional_kwargs.get("finish_reason")
+        )
 
-        # may be incorrect
-        finish_reason = resp.additional_kwargs.get("finish_reason")
-        if finish_reason == "length":
-            LOGGER.warning(
-                f'response was truncated by token limit {settings.model.get("max_completion_tokens")}, fallback'
-            )
-            resp.tool_calls = []
-            warning_msg = SystemMessage(
-                content="[SYSTEM: Your previous response was truncated due to token limits. "
-                "Please continue exactly where you left off in your next response.]"
-            )
-            messages = [newAIMessage(resp.content,role,usage),warning_msg]
-        
-        if resp.tool_calls:
-            route, next_role = "tool_node", "writer"
-        else:
-            if settings.chat.get("duo") == True:
-                if final_call:
-                    route, next_role = "end", "writer"
-                else:
-                    route, next_role = "llm_call", "validator"
-            else:
-                route, next_role = "end", "writer"
+    text_exists = isinstance(resp.content,list) and len(resp.content) > 0 and resp.content[0].get("text") is not None
+    LOGGER.debug(f'text exists {text_exists}')
+    # use later to eliminate empty responses
+    truncated = finish_reason == "length"
+    if truncated:
+        LOGGER.warning(
+            f'response was truncated by token limit {settings.model.get("max_completion_tokens")}, fallback'
+        )
+        resp.tool_calls = []
+        warning_msg = SystemMessage(
+            content="[SYSTEM: Your previous response was truncated due to token limits. "
+            "Please continue exactly where you left off in your next response.]"
+        )
+        messages = [newAIMessage(resp.content, role, usage), warning_msg]
 
-    else:  # curr role validator
-        # hardcode JSON schema
-        base_prompt = settings.chat.get('validator_system_prompt', 'You are a validator.')                                                   
-        system_prompt = f"{base_prompt}\n\nRespond ONLY with JSON matching this schema: {ValidatorResponse.__annotations__}" 
-        # trimmed data (writer message only)
-        payload_messages = [SystemMessage(content=system_prompt)] \
-            + state["messages"][-1:]
-
-        model = llm.with_structured_output(ValidatorResponse, include_raw=True)
-        resp_out = await model.ainvoke(payload_messages, config=config)
-        
-
-        LOGGER.info(str(resp_out))
-
-        try:
-            data = resp_out["parsed"]
-            usage = getattr(resp_out['raw'],"usage_metadata",None)
-            accepted = data.get("accepted", False)
-            content = data.get("content", "No content provided.")
-
-            if accepted:
-                route, next_role = "end", "writer"
-            else:
-                route, next_role = "llm_call", "writer"
-
-            LOGGER.debug(f"validator {accepted!s} {content}")
-            messages = [newAIMessage(content,role,usage)]
-
-
-        except Exception as err:
-            LOGGER.warning(f"error parse validator response {err}")
-            route, next_role = "llm_call", "writer"
-            messages = [newAIMessage(f"[FAIL] Error parsing validator response: {err}",role,usage)]
-
+    cont = truncated and not final_call
+    next_node = ("writer" if cont                                                                                    
+              else "tool_node" if resp.tool_calls                                                                 
+              else "validator" if settings.chat.get("duo") and not final_call                                     
+              else "end") 
+    
     return {
         "messages": messages,
         "llm_calls": calls,
         "loaded_files": loaded_update,
         "cwd_tree": cwd_tree,
-        "route": route,
-        "agent_role": next_role,
+        "next": next_node,
+        "agent_role": "writer",
     }
 
 
+async def validator_node(
+    state: State, config: RunnableConfig, settings: Settings, tools: list[BaseTool]
+):
+    role = "validator"
+    calls = state.get("llm_calls", 0) + 1
+
+    llm = build_llm(settings)
+    base_prompt = settings.chat.get("validator_system_prompt", "You are a validator.")
+    system_prompt = f"{base_prompt}\n\nRespond ONLY with JSON matching this schema:{get_schema(ValidatorResponse)}"
+    payload_messages = [SystemMessage(content=system_prompt)] + state["messages"][-1:]
+
+    model = llm.with_structured_output(ValidatorResponse, include_raw=True)
+    resp_out = await model.ainvoke(payload_messages, config=config)
+
+    accepted = False
+    usage = None
+    content = "No content provided."
+    try:
+        data = resp_out["parsed"]
+        usage = getattr(resp_out["raw"], "usage_metadata", None)
+        accepted = data.get("accepted", False)
+        content = data.get("content", "No content provided.")
+        messages = [newAIMessage(content, role, usage)]
+    except Exception as err:
+        LOGGER.error(f"error parse validator response {err}")
+        messages = [
+            newAIMessage(f"[FAIL] Error parsing validator response: {err}", role, usage)
+        ]
+
+    next_node = "writer" if not accepted else "end"
+    return {
+        "messages": messages,
+        "llm_calls": calls,
+        "next": next_node,
+        "agent_role": "validator",
+    }
+
 def should_verify(state: State, settings: Settings):
+    """deprcated"""
     from langchain_core.messages import ToolMessage
     last_msg = state["messages"][-1]
 
@@ -240,6 +233,9 @@ async def _exec(cmd: str) -> tuple:
 async def verification_node(state: State, settings: Settings):
     from langchain_core.messages import HumanMessage
 
+    duo = settings.chat.get("duo",False)
+    next_role = "validator" if duo else "writer"
+
     check_cmd = settings.verification.get("check_command")
     observe_cmd = settings.verification.get("observe_command")
 
@@ -254,18 +250,23 @@ async def verification_node(state: State, settings: Settings):
         LOGGER.info(f"OBSERVE RES {stdout} {stderr}")
         content += f"Observer output (`{observe_cmd}`), return code {retcode}\n{(stdout or stderr)}\n"
 
-    return {"messages": [HumanMessage(content=content)]}
+    return {
+        "messages": [HumanMessage(content=content)],
+        "next": next_role
+        }
 
-
-def should_continue(state: State):
+def should_continue(state: State) -> Literal["tool_node","end"]:
     END = "__end__"
     from langchain_core.messages import AIMessage
 
+    LOGGER.info(str())
+
     messages = state.get("messages", [])
     if not messages:
-        return END
+        return "end"
 
     last = messages[-1]
     if isinstance(last, AIMessage) and last.tool_calls:
+        LOGGER.info('route to tool node')
         return "tool_node"
-    return END
+    return "end"

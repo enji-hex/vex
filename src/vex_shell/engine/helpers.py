@@ -104,7 +104,6 @@ def format_file_context(
     LOGGER.debug(str(content_blocks))
     return content_blocks, image_paths
 
-
 def normalize_tool_calls(msg:AIMessage,tool_names:list[str]) -> AIMessage:
     from langchain_core.messages import ToolCall
 

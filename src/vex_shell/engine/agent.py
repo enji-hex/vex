@@ -22,13 +22,14 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph, StateGraph
     from vex_shell.mcp_tools.tools_mcp import MCPManager
 
-def _parse_content(text:str):
+
+def _parse_content(text: str):
     """Parse .content or return text as-is"""
     try:
-        return json.loads(text).get("content","")
+        return json.loads(text).get("content", "")
     except:
         return text
-    
+
 
 async def process(stream) -> AsyncIterator[AgentEvent]:
     async for event in stream:
@@ -37,7 +38,7 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
         data = params.get("data", {})
 
         if method == "tools":
-            # LOGGER.debug(f"tools: {method} {data}")
+            LOGGER.debug(f"tools: {method} {data}")
 
             event_type = data.get("event")
             if event_type == "tool-started":
@@ -55,31 +56,34 @@ async def process(stream) -> AsyncIterator[AgentEvent]:
                 yield ToolStop(data.get("tool_call_id"), str(data.get("output")))
             continue
 
-        if method == "messages":
-            if isinstance(data, (list, tuple)) and len(data) >= 2:
-                msg_data, graph_meta = data[0], data[1]
-            else:
-                continue
+        if method != "messages":
+            continue
+        if not (isinstance(data, (list, tuple)) and len(data) >= 2):
+            continue
 
-            if not isinstance(msg_data, dict) or not isinstance(graph_meta, dict):
-                continue
-            event_type = msg_data.get("event")
-            node_name = graph_meta.get("langgraph_node","VEX")
-            LOGGER.debug(f'messages {node_name} {msg_data}')
+        msg_data, graph_meta = data[0], data[1]
+        if not isinstance(msg_data, dict) or not isinstance(graph_meta, dict):
+            continue
 
-            # here's just raw json, instead of description field
-            if event_type == "content-block-finish":
-                text = msg_data.get("content",{}).get("text")
-                if text:
-                    yield TextFinish(_parse_content(text),node_name)
+        event_type = msg_data.get("event")
+        node_name = graph_meta.get("langgraph_node", "VEX")
+        content = msg_data.get("content")
+        text = content.get("text") if isinstance(content, dict) else content
+        LOGGER.debug(f"messages {node_name} {msg_data}")
 
-            if event_type == "message-finish" and "usage" in msg_data:
-                usage = msg_data["usage"]
-                yield TokenUsage(
-                    tok_in=usage.get("input_tokens", 0),
-                    tok_out=usage.get("output_tokens", 0),
-                    tok_total=usage.get("total_tokens", 0),
-                )
+        # here's just raw json, instead of description field
+        if event_type == "content-block-finish":
+            if text and str(text).replace("\n", ""):
+                yield TextFinish(_parse_content(text), node_name)
+        elif event_type == "message-finish" and "usage" in msg_data:
+            usage = msg_data["usage"]
+            yield TokenUsage(
+                tok_in=usage.get("input_tokens", 0),
+                tok_out=usage.get("output_tokens", 0),
+                tok_total=usage.get("total_tokens", 0),
+            )
+            
+
 
 class Agent:
     def __init__(
@@ -102,19 +106,19 @@ class Agent:
             "configurable": {
                 "thread_id": session_id,
                 "use_vision": settings.model.get("use_vision", False),
-                "cache_on_write":settings.chat.get('cache_on_write',False),
+                "cache_on_write": settings.chat.get("cache_on_write", False),
             },
-            "callbacks":[callback]
+            "callbacks": [callback],
         }
         self.token_usage = TokenUsage()
 
     @classmethod
     async def create(
-        cls, # class instance
-        graph:StateGraph,
-        session_id:str,
-        settings:Settings,
-        mcp_manager:MCPManager | None = None
+        cls,  # class instance
+        graph: StateGraph,
+        session_id: str,
+        settings: Settings,
+        mcp_manager: MCPManager | None = None,
     ) -> Self:
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
@@ -125,53 +129,50 @@ class Agent:
         await checkpointer.setup()
         compiled_graph = graph.compile(checkpointer=checkpointer)
 
-        agent =  cls(compiled_graph,session_id,settings,conn,mcp_manager)
-        if agent.settings.chat.get('autosync_cwd_tree',False):
+        agent = cls(compiled_graph, session_id, settings, conn, mcp_manager)
+        if agent.settings.chat.get("autosync_cwd_tree", False):
             LOGGER.debug(_tree_tool())
         return agent
 
-
     async def reconfigure_settings(self):
-        self.settings._configure() # fa_control reconfigured inside 
-        self.config['configurable'].update({
-            "use_vision":self.settings.model.get("use_vision", False),
-            "cache_on_write":self.settings.chat.get("cache_on_write", False),
-        })
-
+        self.settings._configure()  # fa_control reconfigured inside
+        self.config["configurable"].update(
+            {
+                "use_vision": self.settings.model.get("use_vision", False),
+                "cache_on_write": self.settings.chat.get("cache_on_write", False),
+            }
+        )
 
     async def get_state(self):
         return await self.graph.aget_state(self.config)
 
-    async def read_files(self,pattern:str) -> list[str]:
+    async def read_files(self, pattern: str) -> list[str]:
         from vex_shell.tools.tools import _glob_tool, _read_files
 
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
 
         files = _glob_tool([pattern])
-        LOGGER.debug(f'glob found {files!s} files')
-        
-        loaded,msgs = _read_files(files,self.config,state_values)
-        update_payload:dict = {"loaded_files":loaded}
+        LOGGER.debug(f"glob found {files!s} files")
+
+        loaded, msgs = _read_files(files, self.config, state_values)
+        update_payload: dict = {"loaded_files": loaded}
 
         if "messages" not in state_values:
             update_payload["messages"] = []
 
-        await self.graph.aupdate_state(
-            self.config,
-            update_payload,
-            as_node="writer")
-        LOGGER.debug(f'manual caching, cached total {len(loaded)} files')
+        await self.graph.aupdate_state(self.config, update_payload, as_node="writer")
+        LOGGER.debug(f"manual caching, cached total {len(loaded)} files")
         return msgs
-    
-    async def purge_files(self,pattern:str) -> list[str]:
+
+    async def purge_files(self, pattern: str) -> list[str]:
         from vex_shell.tools.tools import _glob_tool
 
         current_state = await self.get_state()
         state_values = current_state.values if current_state else {}
         cwd = Path(file_access_control.cwd)
 
-        loaded = state_values.get("loaded_files",{})
+        loaded = state_values.get("loaded_files", {})
         new_loaded = loaded.copy()
 
         normalized_patterns = [pattern]
@@ -179,38 +180,39 @@ class Agent:
             try:
                 rel_p = Path(p).relative_to(cwd).as_posix()
                 normalized_patterns.append(rel_p)
-            
+
             # if not relative ( like other drive path)
             except ValueError:
                 normalized_patterns.append(p)
-        
+
         msgs = []
         purge_payloads = {}
         for key in list(new_loaded.keys()):
             for p in normalized_patterns:
-                if fnmatch(key,p) or key == p:
+                if fnmatch(key, p) or key == p:
                     purge_payloads[key] = None
                     msgs.append(f"del from cache {key}")
                     break
-        
+
         if purge_payloads:
             await self.graph.aupdate_state(
-                self.config,
-                {"loaded_files":purge_payloads},
-                as_node="writer")
-        
-        LOGGER.info(f'manual caching, del total {len(loaded)} files')
+                self.config, {"loaded_files": purge_payloads}, as_node="writer"
+            )
+
+        LOGGER.info(f"manual caching, del total {len(loaded)} files")
         return msgs
-    
-    async def run_step(self,user_input:str) -> AsyncIterator[AgentEvent]:
+
+    async def run_step(self, user_input: str) -> AsyncIterator[AgentEvent]:
         from langchain_core.messages import HumanMessage
         from langgraph.prebuilt import ToolCallTransformer
 
         # reset llm_calls
         stream = await self.graph.astream_events(
             {
-                "messages": [HumanMessage(content=user_input,response_metadata={"role":"user"})],
-                "llm_calls":0
+                "messages": [
+                    HumanMessage(content=user_input, response_metadata={"role": "user"})
+                ],
+                "llm_calls": 0,
             },
             config=self.config,
             version="v3",
@@ -218,15 +220,15 @@ class Agent:
         )
 
         async for event in process(stream):
-            if isinstance(event,TokenUsage):
-                self.token_usage.tok_in     += event.tok_in
-                self.token_usage.tok_out    += event.tok_out
-                self.token_usage.tok_total  += event.tok_total
+            if isinstance(event, TokenUsage):
+                self.token_usage.tok_in += event.tok_in
+                self.token_usage.tok_out += event.tok_out
+                self.token_usage.tok_total += event.tok_total
                 LOGGER.info(
                     f"token usage for message in:{event.tok_in} out:{event.tok_out} total:{event.tok_total}"
                 )
             yield event
-    
+
     async def close(self):
         await self.conn.close()
         if self.mcp_manager:

@@ -1,10 +1,21 @@
-logging_level = "debug"
+logging_level = "info"
 
 [chat]
 # control imported MCP tools only, core tools available always, 
 # Important MCP tools NOT restricted by R/W permission management
 use_mcp =  false
-duo = false # testing mode
+# duo mode equires JSON support from model
+duo = false
+validator_system_prompt= """
+You are a strict technical auditor.                                                                                                          
+Your task is to review the previous agent's response for:
+1. Logical errors or hallucinations.
+2. Incorrect tool usage or syntax.
+3. Failure to follow user constraints.
+
+If the response is perfect, set accepted: true.
+If there are flaws, set accepted: false and provide a concise critique.
+"""
 
 # count of messages loaded in console (not sliding window)
 load_last_n =  10
@@ -13,8 +24,8 @@ load_last_n =  10
 keep_tool_logs =  false
 
 custom_cwd = ""             # optional
-autosync_cwd_tree = false   # Automatically attach current working directory tree(with only permitted files) to agent context
-cache_on_write    = false   # Auto read each file written by LLM
+autosync_cwd_tree = false
+cache_on_write    = true   # Auto read each file written by LLM
 theme = "Land-of-Ooo"
 
 [verification]
@@ -23,20 +34,20 @@ observe_command = ""
 
 [model]
 # used ChatOpenAI
-llm_url = "https://nano-gpt.com/api/v1"
-# proxy="socks5://127.0.0.1:20170"
-
-max_llm_calls = 3 # 3 default, -1 disable
+llm_url = "https://openrouter.ai/api/v1"
+#proxy="socks5://127.0.0.1:20170"
+max_llm_calls = 3 # per-agent-turn default 3, -1 disabled
 
 use_vision = false # optional,image read support
-name = "openai/gpt-6-luna-pro"
+
+name = "~deepseek/deepseek-flash-latest"
 
 # set to -1 set infinity length
 context_sliding_window = 10 # default 10
 temperature = 0
-max_completion_tokens = 8000
+max_completion_tokens = 8092
 timeout =  60
-max_retries = 3
+max_retries = 2
 
 [permissions]
 # r - read, w - write access
@@ -45,6 +56,7 @@ max_retries = 3
 # ./** current directory + all subdirectories
 # * , e.g. "r *" full read access
 # empty patterns, no access at all
+# DOS NOT support multiple extensions and queries
 
 patterns = [
     "r ./**",

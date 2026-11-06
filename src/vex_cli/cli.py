@@ -130,14 +130,10 @@ def cli():
 
     try:
         asyncio.run(run_agent(args))
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        from rich.console import Console
-        Console().print("\n[yellow]Session interrupted by user. Shutting down...[/yellow]")
-    
     except Exception as e:
         from rich.console import Console
         Console().print(f"\n[red][bold]Unexpected error:[/bold] {e}[/red]")
-        import traceback;traceback.print_exc()
+        # import traceback;traceback.print_exc()
     
 
 if __name__ == "__main__":

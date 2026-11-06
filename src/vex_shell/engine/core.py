@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Hashable, Tuple
 from langchain_core.messages import AnyMessage
 
 from vex_shell.engine.events import TokenUsage
+from vex_shell.engine.state import State
 from vex_shell.utils.config import LOGGER
 
 # from langgraph.graph import START, END
@@ -45,45 +46,48 @@ async def get_tools(settings: Settings) -> tuple[list[BaseTool], MCPManager | No
 def build_graph(settings: Settings, tools: list[BaseTool]) -> StateGraph:
     from langgraph.graph.state import StateGraph
     from langgraph.prebuilt import ToolNode
+    from .nodes import (
+            verification_node,
+            writer_node,
+            validator_node,
+            should_verify
+        )
 
-    from .nodes import llm_call_node, should_continue, should_verify, verification_node
-    from .state import State
+    def router(state:State) -> str:
+        return state.get("next","end")
 
     graph = StateGraph(State)
     duo = settings.chat.get("duo", False)
 
     # LLM Nodes
-    graph.add_node("writer", partial(llm_call_node, settings=settings, tools=tools))
+    graph.add_node("writer", partial(writer_node, settings=settings, tools=tools))
     graph.add_node("tool_node", ToolNode(tools))
     graph.add_node("verification_node", partial(verification_node, settings=settings))
     if duo:
-        graph.add_node("validator",partial(llm_call_node,settings=settings,tools=tools))
+        graph.add_node("validator",partial(validator_node,settings=settings,tools=tools))
 
     # Graph Edges
     graph.add_edge(START, "writer")
-    writer_map: dict[Hashable,str] = {
-        "tool_node":"tool_node",
-        "end":"__end__",
-        "llm_call":"validator" if duo else "__end__"
-    }
-    
+    writer_targets: dict[Hashable,str] = {"tool_node":"tool_node","end":"__end__"}
     if duo:
-        graph.add_conditional_edges("writer", lambda s:s.get("route","end"),writer_map)
-    else:
-        graph.add_conditional_edges("writer", should_continue, ["tool_node", END])
+        writer_targets["validator"] = "validator"
+    graph.add_conditional_edges("writer", router, writer_targets)
 
     graph.add_conditional_edges(
-        "tool_node",  # source node
-        partial(should_verify, settings=settings),  # check condition
-        {"verification_node": "verification_node", "writer": "writer"},
-    )
-    graph.add_edge("verification_node", "validator" if duo else "writer")
-    if duo:
-        graph.add_conditional_edges(
-            "validator",
-            lambda s: s.get("route","end"),
-            {"writer":"writer","end":"__end__"}
+        "tool_node",
+        partial(should_verify,settings=settings),
+        {"verification_node": "verification_node", "writer": "writer"}
         )
+
+    if duo:                                                                                                      
+        verification_targets: dict[Hashable,str] = {"validator": "validator", "writer": "writer"}                                    
+    else:                                                                                                        
+        verification_targets: dict[Hashable,str] = {"writer": "writer"}   
+    graph.add_conditional_edges("verification_node", router,verification_targets)
+
+    if duo:
+        validator_targets: dict[Hashable,str] = {"writer": "writer", "end": END}                                                     
+        graph.add_conditional_edges("validator", router, validator_targets)
 
     return graph
 
@@ -115,7 +119,6 @@ async def graph_restore_history(graph, config) -> Tuple[list[SavedMessage],Token
         if role is None: 
             role = 'VEX' if m.type == "ai" else "user"
 
-        LOGGER.debug(f"Message from role: {role} | Content: {m}")
         if m.type == "human":
             recent_messages.append(SavedMessage(m,role))
         elif m.type == "ai":
