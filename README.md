@@ -12,6 +12,10 @@
 
 VEX is a **terminal‑first AI agent** (and *open source async agentic runtime*) that keeps your workspace continuously in sync with your LLM session using Active Working Context.
 
+<div style="width:70%"> 
+<img src="./docs/ase-test-1.gif" >
+</div>
+
 ## Core Highlights
 - **State‑graph agent** - Powered by async SQLite checkpointing; sessions survive crashes and can be resumed anytime.
 - **Active Working Context** – Automatically injects current file states and directory trees into the prompt, cutting context overhead.
@@ -154,11 +158,14 @@ TOTAL     1702
 - [Architecture Deep Dive: Startup Time & Import Optimization](./docs/vex_startup_time_optimization.md)
 
 ## Enhancement Proposals (EPs)
-- 01 [DONE] On-demand `write_file` appending, remove if write access denied.
-- 02 [DONE] On-The-Fly RW permission update (in CONFIG.toml)
+**EP 01 [DONE]**  \
+On-demand `write_file` appending, remove if write access denied.
 
+**EP 02 [DONE]** \
+On-The-Fly RW permission update (in CONFIG.toml)
 
-- 03 [Maybe] Add manual RAG-DB document insert by wildcard pattern with `/index <path> <domain>`
+**EP 03 [MAYBE]** \
+Add manual RAG-DB document insert by wildcard pattern with `/index <path> <domain>`
 
 Pros:
 - more deterministic index system
@@ -172,6 +179,25 @@ res = await mcp_manager.call_tool("insert_doc",{
 print(res)
 ```
 *Example of usage `/index compiler/*.pdf compilers`*
+
+**EP 04 [REQUIRED]** \
+Unify permissions for ASE and embedded tools. patterns treats 
+as sandbox paths for ASE
+`rw ./src/vex/**` means `sandbox_path ./src/vex`.
+Minor clarification: ASE can't handle glob file patterns of course, 
+so all files in sandbox either accessible or not accessible for ASE
+
+**EP 05 [REQUIRED]** 
+Transform chat history in plain text form. Attach such chat history to 
+each new LLM request. Use follow form context form:
+`<System Message> <User Message>`, \
+Where User Message `<Chat History> <Active Context> <User Prompt>`
+
+**EP 06 [REQUIRED]** \
+`patch_file` tool, use for partial file
+
+## Known Issues
+1. Ivalid empty response handling in writer node
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.

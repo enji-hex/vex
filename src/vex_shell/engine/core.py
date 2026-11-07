@@ -9,6 +9,7 @@ from langchain_core.messages import AnyMessage
 from vex_shell.engine.events import TokenUsage
 from vex_shell.engine.state import State
 from vex_shell.utils.config import LOGGER
+from vex_shell.utils.file_access import file_access_control
 
 # from langgraph.graph import START, END
 # thi shit imports ENTIRE langgraph.graph module!!!
@@ -31,12 +32,16 @@ if TYPE_CHECKING:
 async def get_tools(settings: Settings) -> tuple[list[BaseTool], MCPManager | None]:
     from ..tools.tools import get_tools
 
-    tools = get_tools()
-    mcp_manager = None
+    ignore_list = []
+    if len(file_access_control.write_patterns) == 0 and not file_access_control.all_write:
+        ignore_list.append("write_file")
+    if settings.model.get("ase_sandbox") == None:
+        ignore_list.append("ase_tool")
+    tools = get_tools(ignore_list)
 
+    mcp_manager = None
     if settings.chat["use_mcp"]:
         from vex_shell.mcp_tools.tools_mcp import load_mcp_tools
-
         mcp_tools, mcp_manager = await load_mcp_tools()
         tools.extend(mcp_tools)
 

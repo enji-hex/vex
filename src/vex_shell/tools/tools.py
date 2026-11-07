@@ -317,22 +317,30 @@ def _tree_tool(root: str = ".") -> str:
 
     return "\n".join(lines)
 
-
 @tool
 def tree_tool(root: str = ".") -> str:
     """Return an indented tree view of *root* showing permission-validated files."""
-    res =  _tree_tool(root)
-    LOGGER.debug(res)
-    return res
+    return _tree_tool(root)
 
-def get_tools():
+@tool
+def ase_tool(cmd:str,sandbox_dir_path:str = ".") -> str:
+    """
+    Arbitrary Shell Executor (ASE) tool
+    Accepts: command, sandbox_dir_path (default CWD)
+    """
+    # CANNOT emit error
+    from vex_shell.tools.ase import ase_executor
+    res = ase_executor(cmd,sandbox_dir_path)
+    ok = "OK" if res.exit_code == 0 else "FAIL"
+    return f"[{ok}] retcode:{res.exit_code} {res.stdout}{res.stderr}" # only one std are filled
+
+def get_tools(ignore_list:list[str]):
     tools = []
-    has_write_access = len(file_access_control.write_patterns) > 0 or file_access_control.all_write
     for obj in globals().values():
         if isinstance(obj,BaseTool):
-            if obj.name == "write_file" and has_write_access == False:
+            if obj.name in ignore_list:
+                LOGGER.debug(f"tool {obj.name} ignored")
                 continue
             tools.append(obj)
-
     LOGGER.info(f"Loaded {len(tools)} tools: {[t.name for t in tools]!s}")
     return tools

@@ -130,8 +130,6 @@ class Agent:
         compiled_graph = graph.compile(checkpointer=checkpointer)
 
         agent = cls(compiled_graph, session_id, settings, conn, mcp_manager)
-        if agent.settings.chat.get("autosync_cwd_tree", False):
-            LOGGER.debug(_tree_tool())
         return agent
 
     async def reconfigure_settings(self):
