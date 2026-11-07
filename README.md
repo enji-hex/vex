@@ -103,6 +103,9 @@ Full agent functionality out of the box!!
 > File-access permissions apply to VEX’s built-in file tools only. They do not restrict MCP tools or commands configured under check_command and observe_command. \
 > These commands execute in the working directory; configure only trusted MCP servers and commands.
 
+> [!IMPORTANT] 
+> Current version of ASE in TESTING stage, it uses Read and Write access, be careful!
+
 ## Example Workflow
 1. `read_files path/to/module.py` – caches the file in the active context.
 2. Ask the agent: “Refactor `module.py` to use async I/O.”

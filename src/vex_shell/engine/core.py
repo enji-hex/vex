@@ -73,7 +73,11 @@ def build_graph(settings: Settings, tools: list[BaseTool]) -> StateGraph:
 
     # Graph Edges
     graph.add_edge(START, "writer")
-    writer_targets: dict[Hashable,str] = {"tool_node":"tool_node","end":"__end__"}
+    writer_targets: dict[Hashable,str] = {
+        "tool_node":"tool_node",
+        "end":"__end__",
+        "writer":"writer" # retry on error (truncated or empty response)
+        }
     if duo:
         writer_targets["validator"] = "validator"
     graph.add_conditional_edges("writer", router, writer_targets)

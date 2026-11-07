@@ -129,9 +129,6 @@ async def writer_node(
         or resp.additional_kwargs.get("finish_reason")
         )
 
-    text_exists = isinstance(resp.content,list) and len(resp.content) > 0 and resp.content[0].get("text") is not None
-    LOGGER.debug(f'text exists {text_exists}')
-    # use later to eliminate empty responses
     truncated = finish_reason == "length"
     if truncated:
         LOGGER.warning(
@@ -147,8 +144,10 @@ async def writer_node(
     # Check if response contains valid text
     has_text = False
     if isinstance(resp.content, str):
+        # check plain text message (str)
         has_text = bool(resp.content.strip())
     elif isinstance(resp.content, list):
+        # check complex message (if list)
         has_text = any(
             isinstance(block, dict) and block.get("type") == "text" and block.get("text")
             for block in resp.content
@@ -178,15 +177,28 @@ async def writer_node(
 
 
 async def validator_node(
-    state: State, config: RunnableConfig, settings: Settings, tools: list[BaseTool]
+    state: State, config: RunnableConfig, 
+    settings: Settings, tools: list[BaseTool]
 ):
+    """Last AI-message considered as verified, otherwise used last available msg"""
     role = "validator"
     calls = state.get("llm_calls", 0) + 1
 
     llm = build_llm(settings)
     base_prompt = settings.chat.get("validator_system_prompt", "You are a validator.")
     system_prompt = f"{base_prompt}\n\nRespond ONLY with JSON matching this schema:{get_schema(ValidatorResponse)}"
-    payload_messages = [SystemMessage(content=system_prompt)] + state["messages"][-1:]
+
+    last_ai_msg = None
+    for m in reversed(state['messages']):
+        if isinstance(m,AIMessage):
+            last_ai_msg = m
+            break
+    
+    if last_ai_msg:
+        payload_messages = [SystemMessage(content=system_prompt),last_ai_msg]
+    else:
+        # fallback to last message (could be verification message)
+        payload_messages = [SystemMessage(content=system_prompt)] + state["messages"][-1:]
 
     model = llm.with_structured_output(ValidatorResponse, include_raw=True)
     resp_out = await model.ainvoke(payload_messages, config=config)
