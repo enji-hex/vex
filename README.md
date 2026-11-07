@@ -51,6 +51,13 @@ vex --init
 vex
 ```
 
+Potentially any provider supporting the standard OpenAI API endpoint should be 
+compatible.
+
+Tested providers:
+- OpenRouter: `https://openrouter.ai/api/v1`
+- NanoGPT: `https://nano-gpt.com/api/v1`
+- Ollama / llama.cpp
 
 ### As Python Library
 

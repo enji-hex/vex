@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vex_shell"
-version = "1.2"
+version = "1.2.1"
 description = "Lean AI agent that works as U expect"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -45,5 +45,4 @@ vex = "vex_cli.cli:cli"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"vex_cli.web.static" = ["*", "**/*"]
 "vex_shell.templates" = ["*"]
