@@ -51,6 +51,7 @@ def ase_executor(cmd: str, sandbox_dir: str = ".", timeout: int = 10) -> AseResp
         curr = curr / part
         cmd_args.extend(["--dir",str(curr)])
 
+    # todo: parse prefix from file_permissions later
     cmd_args.extend([
         "--bind", s_str,s_str,
         "sh","-c",cmd

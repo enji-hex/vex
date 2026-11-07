@@ -144,11 +144,28 @@ async def writer_node(
         )
         messages = [newAIMessage(resp.content, role, usage), warning_msg]
 
-    cont = truncated and not final_call
-    next_node = ("writer" if cont                                                                                    
-              else "tool_node" if resp.tool_calls                                                                 
-              else "validator" if settings.chat.get("duo") and not final_call                                     
-              else "end") 
+    # Check if response contains valid text
+    has_text = False
+    if isinstance(resp.content, str):
+        has_text = bool(resp.content.strip())
+    elif isinstance(resp.content, list):
+        has_text = any(
+            isinstance(block, dict) and block.get("type") == "text" and block.get("text")
+            for block in resp.content
+        )
+
+    # Routing logic
+    if truncated:
+        next_node = "writer"
+    elif resp.tool_calls:
+        next_node = "tool_node"
+    elif not has_text and not final_call:
+        # Writer provided no text and called no tools -> route back to retry
+        next_node = "writer"
+    elif settings.chat.get("duo") and not final_call:
+        next_node = "validator"
+    else:
+        next_node = "end" 
     
     return {
         "messages": messages,

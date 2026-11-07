@@ -110,8 +110,9 @@ Full agent functionality out of the box!!
 
 ## Extending VEX
 - **Custom Tools**: Add standard LangChain tools inside src/vex_shell/tools/tools.py.
+- [**VEX-RAG**](https://codeberg.org/Enji/vex-rag): RAG database MCP-tool, uses same sqlite database as vex itself, supports `Vector,BM25 and Hybrid` search modes.
+- [**v2t**](https://codeberg.org/Enji/v2t): Minimalist Voice-to-Text transcription tool, useus local LLM, connection via NamedPipes.
 - **MCP Servers**: Configure external Model Context Protocol endpoints inside .vex/mcp_config.json.
-- **UI Themes**: Define custom terminal color schemes inside src/vex_cli/colors.py.
 
 
 ## CLI Flags

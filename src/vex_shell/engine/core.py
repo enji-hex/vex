@@ -35,7 +35,7 @@ async def get_tools(settings: Settings) -> tuple[list[BaseTool], MCPManager | No
     ignore_list = []
     if len(file_access_control.write_patterns) == 0 and not file_access_control.all_write:
         ignore_list.append("write_file")
-    if settings.model.get("ase_sandbox") == None:
+    if not settings.model.get("ase_sandbox"):
         ignore_list.append("ase_tool")
     tools = get_tools(ignore_list)
 
