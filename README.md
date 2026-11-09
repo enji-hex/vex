@@ -120,10 +120,12 @@ Full agent functionality out of the box!!
 
 ## Extending VEX
 - **Custom Tools**: Add standard LangChain tools inside src/vex_shell/tools/tools.py.
-- [**VEX-RAG**](https://codeberg.org/Enji/vex-rag): RAG database MCP-tool, uses same sqlite database as vex itself, supports `Vector,BM25 and Hybrid` search modes.
-- [**v2t**](https://codeberg.org/Enji/v2t): Minimalist Voice-to-Text transcription tool, useus local LLM, connection via NamedPipes.
 - **MCP Servers**: Configure external Model Context Protocol endpoints inside .vex/mcp_config.json.
-
+- [**VEX-RAG**](https://codeberg.org/Enji/vex-rag): RAG database MCP tool; 
+  uses the same SQLite database as VEX itself and supports vector, BM25, 
+  and hybrid search modes.
+- [**v2t**](https://codeberg.org/Enji/v2t): Minimalist voice-to-text 
+  transcription tool; uses a local LLM with connections via named pipes.
 
 ## CLI Flags
  
@@ -150,15 +152,15 @@ Full agent functionality out of the box!!
 | `/q` | Quit the current VEX session. |
 
 
-## **Metrics (25.10.2026)**
+## **Metrics (9.11.2026)**
 
 - **Footprint**
 ```
 ---------------------
 Module    LOC
-VEX_SHELL 1183
-VEX_CLI   519
-TOTAL     1702
+VEX_SHELL 1445
+VEX_CLI   543
+TOTAL     1988
 ---------------------
 ```
 - **Start time:** ~2.12s
