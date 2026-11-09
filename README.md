@@ -210,7 +210,7 @@ Where User Message `<Chat History> <Active Context> <User Prompt>`
 `patch_file` tool, use for partial file
 
 ## Known Issues
-1. Ivalid empty response handling in writer node
+1. Invalid empty response handling in writer node
 
 ## License
 GPL‑3 – feel free to fork, improve, and share.
