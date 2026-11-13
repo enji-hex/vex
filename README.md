@@ -158,13 +158,13 @@ Full agent functionality out of the box!!
 ```
 ---------------------
 Module    LOC
-VEX_SHELL 1445
+VEX_SHELL 1519
 VEX_CLI   543
-TOTAL     1988
+TOTAL     2062
 ---------------------
 ```
-- **Start time:** ~2.12s
-- **utility functions (-ls/--help):** ~400ms
+- **Start time:** ~0.767s (SSD sata 3)
+- **utility functions (-ls/--help):** ~142ms (SSD sata 3)
 
 ## Additional Documentation
 - [Agentic Awareness](./docs/vex_agentic_awareness.md)
@@ -200,7 +200,7 @@ as sandbox paths for ASE
 Minor clarification: ASE can't handle glob file patterns of course, 
 so all files in sandbox either accessible or not accessible for ASE
 
-**EP 05 [REQUIRED]** 
+**EP 05 [DONE]** 
 Transform chat history in plain text form. Attach such chat history to 
 each new LLM request. Use follow form context form:
 `<System Message> <User Message>`, \

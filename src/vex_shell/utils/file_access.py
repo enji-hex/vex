@@ -148,10 +148,11 @@ class FileAccessControl:
         write_perm = self._build_perm(self.all_write,self.write_patterns)
 
         return f"""
-ENVIRONMENT METADATA:
+<env_metadata>
 - Current Working Directory (CWD): {self.cwd}
 - Permitted Read Scopes:  {read_perm}
 - Permitted Write Scopes: {write_perm}
+</env_metadata>
 """.strip()
 
 # initialize fa_control

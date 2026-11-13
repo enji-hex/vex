@@ -29,7 +29,6 @@ def newAIMessage(text,role,usage,tool_calls=None):
         usage_metadata=usage,
         tool_calls=tool_calls or [])
 
-
 def build_llm(settings: Settings):
     from langchain_openai import ChatOpenAI
     import os
@@ -52,14 +51,14 @@ def build_llm(settings: Settings):
     )
 
 # LLM NODES
-
-# LLM NODES
 async def writer_node(
     state: State, config: RunnableConfig, settings: Settings, tools: list[BaseTool]
 ):
     from langchain.messages import HumanMessage, SystemMessage
     from .helpers import (
-        format_file_context,
+        show_context_hook,
+        format_chat_plain,
+        msg_get_text,
         get_safe_window,
         normalize_tool_calls,
     )
@@ -82,14 +81,24 @@ async def writer_node(
 
     window = int(settings.model.get("context_sliding_window", 10))
     recent = get_safe_window(state["messages"], window)
+
+    chat_history = recent[:-1] if len(recent) > 1 else []
+    current_msg = msg_get_text(recent[-1]) if recent else ""
     env_block = file_access_control.build_environment_context()
-    context_blocks, image_paths = format_file_context(
-        new_files,
-        env_block,
-        config.get("configurable", {}).get("use_vision", False),
+
+    payload_messages,image_paths = format_chat_plain(
+        history=chat_history,
+        system_message=settings.system_prompt,
+        prompt=current_msg,
+        loaded_files=new_files,
+        env_block=env_block,
+        use_vision=config.get("configurable", {}).get("use_vision", False), 
         cwd_tree=cwd_tree,
+        hook=show_context_hook
     )
 
+    # prune images after 1st request 
+    # (maybe better delete image handlig capability at all ? )
     for p in image_paths:
         loaded_update[p] = None
 
@@ -106,16 +115,11 @@ async def writer_node(
         )
 
     # full active context
-    ephemeral_context_msg = HumanMessage(content=context_blocks)
-    payload_messages = (
-        [SystemMessage(content=system_prompt)] + recent + [ephemeral_context_msg]
-    )
     model = llm if final_call else llm.bind_tools(tools)
     resp = await model.ainvoke(payload_messages, config=config)
     usage = getattr(resp, "usage_metadata", None)
 
     LOGGER.debug(f"writer {resp!s}")
-
     if final_call:
         resp.tool_calls = []
     else:
