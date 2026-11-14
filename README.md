@@ -225,7 +225,6 @@ Facts are emited alogside LLM response in in structured JSON mode:
 > by making 'tool_calls' JSON field as well.
 
 
-
 ## Known Issues
 1. Invalid empty response handling in writer node
 
