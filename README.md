@@ -209,6 +209,22 @@ Where User Message `<Chat History> <Active Context> <User Prompt>`
 **EP 06 [REQUIRED]** \
 `patch_file` tool, use for partial file
 
+**EP 07 [MAYBE]**
+Fact Database - internal fact table that agent populate at will.
+Duplication is prevented via BM25 threshold check in database (zero LLM vector serach overhead).
+
+Facts are emited alogside LLM response in in structured JSON mode:
+```json
+{
+    "answer":"...",
+    "facts":["User prefer no bullshit answer style"]
+}
+```
+
+> P.S. We can use same approach to eliminate Pydantic ToolMessage wrappers,
+> by making 'tool_calls' JSON field as well.
+
+
 ## Known Issues
 1. Invalid empty response handling in writer node
 
